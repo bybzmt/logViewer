@@ -1,46 +1,64 @@
 package protocol
 
-type CMD uint8
+type OP uint8
 
-type VARCHAR struct {
+type VarChar struct {
 	Len  uint16
 	Data []uint8
 }
+type CharArray struct {
+	Len  uint16
+	Data []VarChar
+}
 
 const (
-	CMD_EXIT CMD = iota
-	CMD_PING
-	CMD_PONG
+	OP_RESET OP = iota
+	OP_PING
+	MSG_PONG
 	//列出文件列表
-	CMD_LIST
-	//打开文件 VARCHAR
-	CMD_OPEN
-	//启动操作
-	CMD_START
-	//操作结束
-	CMD_END
-	//取消所有动作
-	CMD_CANCEL
-	//时间段 start(int64) + end(int64)
-	CMD_TIME
-	//seek uint64
-	CMD_SEEK
-	//过滤字符串 bind(uint16) + VARCHAR
-	CMD_GREP
-	CMD_GREP_OR
-	CMD_REGEXP
-	//进度报告 bind(uint16)
-	CMD_PROGRESS
-	//查找方向
-	CMD_REVERSE
-	//找查数量
-	CMD_LIMIT
-	//查换速度
-	CMD_SPEED
-	//跟随文件变化
-	CMD_TAILF
+	OP_LIST
+	//列表响应文件状态
+	MSG_STATE
 	//删除文件
-	CMD_RM
-	CMD_APPEND
-	CMD_TOFILE
+	OP_RM
+	MSG_OK
+	//行起始确定
+	OP_LINE_MATCH
+	OP_LINE_REGEX
+	//打开文件
+	OP_OPEN
+	//启动操作
+	OP_START
+	//响应结束
+	MSG_END
+	//取消动作
+	OP_CANCEL
+	//时间段 start(int64) + end(int64)
+	OP_TIME
+	//seek uint64
+	OP_SEEK
+	//过滤字符串
+	OP_MATCH
+	OP_MATCH_OR
+	OP_REGEXP
+	//进度报告
+	OP_PROGRESS
+	MSG_PROGRESS
+	//查找方向
+	OP_REVERSE
+	//找查数量
+	OP_LIMIT
+	//输出速度
+	OP_SPEED
+	//跟随文件变化
+	OP_TAILF
+	OP_TOFILE
+	//安静模式
+	OP_QUIET
+	MSG_LINE
+	//统计器
+	OP_COUNT_MATCH
+	OP_COUNT_REGEX
+	OP_COUNT
+	MSG_COUNT
 )
