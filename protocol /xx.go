@@ -1,6 +1,6 @@
 package protocol
 
-type OP uint8
+type OP uint16
 
 type VarChar struct {
 	Len  uint16

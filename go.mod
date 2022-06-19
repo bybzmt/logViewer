@@ -1,3 +1,9 @@
 module logViewer
 
 go 1.17
+
+require (
+	github.com/timshannon/bolthold v0.0.0-20210913165410-232392fc8a6a // indirect
+	go.etcd.io/bbolt v1.3.6 // indirect
+	golang.org/x/sys v0.0.0-20200923182605-d9f96fdee20d // indirect
+)
