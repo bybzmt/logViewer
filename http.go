@@ -53,7 +53,8 @@ func (u *Ui) cross(fn http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 
-			//w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "content-type")
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 
 			if r.Method == "OPTIONS" {
@@ -87,7 +88,7 @@ func (u *Ui) apiServerAdd(w http.ResponseWriter, r *http.Request) {
 	rs.User = r.FormValue("User")
 	rs.Passwd = r.FormValue("Passwd")
 	rs.PrivateKey = r.FormValue("PrivateKey")
-	rs.UsePwd = r.FormValue("UsePwd") == "1"
+	rs.UsePwd = r.FormValue("UsePwd") == "true"
 	rs.Note = r.FormValue("Note")
 
 	err := u.store.Insert(bolthold.NextSequence(), &rs)
@@ -108,7 +109,7 @@ func (u *Ui) apiServerEdit(w http.ResponseWriter, r *http.Request) {
 	rs.User = r.FormValue("User")
 	rs.Passwd = r.FormValue("Passwd")
 	rs.PrivateKey = r.FormValue("PrivateKey")
-	rs.UsePwd = r.FormValue("UsePwd") == "1"
+	rs.UsePwd = r.FormValue("UsePwd") == "true"
 	rs.Note = r.FormValue("Note")
 
 	err := u.store.Update(rs.ID, rs)
@@ -136,7 +137,7 @@ func (u *Ui) apiServerDel(w http.ResponseWriter, r *http.Request) {
 func (u *Ui) apiViewLogs(w http.ResponseWriter, r *http.Request) {
 	t1 := []ViewLog{}
 
-	err := u.store.Find(&t1, new(bolthold.Query))
+	err := u.store.Find(&t1, nil)
 	if err != nil {
 		log.Println("log find", err)
 	}
@@ -151,14 +152,12 @@ func (u *Ui) apiViewLogAdd(w http.ResponseWriter, r *http.Request) {
 	rs.ID = uint64(id)
 	rs.Note = r.FormValue("Note")
 	rs.Files = r.FormValue("Files")
-	if r.FormValue("Separator") != "" {
-		rs.Separator = r.FormValue("Separator")[0]
-	}
+	t2, _ := strconv.Atoi(r.FormValue("Separator"))
+	rs.Separator = uint8(t2)
+
 	rs.LineMatch = r.FormValue("LineMatch")
-	rs.Match = r.Form["Match"]
+	rs.Filter = r.FormValue("Filter")
 	rs.Decoder = r.FormValue("Decoder")
-	rs.BeginTime, _ = strconv.ParseInt(r.FormValue("BeginTime"), 10, 64)
-	rs.StopTime, _ = strconv.ParseInt(r.FormValue("StopTime"), 10, 64)
 
 	err := u.store.Insert(bolthold.NextSequence(), &rs)
 	if err != nil {
@@ -176,14 +175,11 @@ func (u *Ui) apiViewLogEdit(w http.ResponseWriter, r *http.Request) {
 	rs.ID = uint64(id)
 	rs.Note = r.FormValue("Note")
 	rs.Files = r.FormValue("Files")
-	if r.FormValue("Separator") != "" {
-		rs.Separator = r.FormValue("Separator")[0]
-	}
+	t2, _ := strconv.Atoi(r.FormValue("Separator"))
+	rs.Separator = uint8(t2)
 	rs.LineMatch = r.FormValue("LineMatch")
-	rs.Match = r.Form["Match"]
+	rs.Filter = r.FormValue("Filter")
 	rs.Decoder = r.FormValue("Decoder")
-	rs.BeginTime, _ = strconv.ParseInt(r.FormValue("BeginTime"), 10, 64)
-	rs.StopTime, _ = strconv.ParseInt(r.FormValue("StopTime"), 10, 64)
 
 	err := u.store.Update(rs.ID, rs)
 	if err != nil {

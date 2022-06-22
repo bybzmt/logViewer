@@ -3,17 +3,18 @@
     import { getContext, onMount, onDestroy } from "svelte";
 
     let axios = getContext("axios");
+
     let rows = [];
     let selected = {};
 
     function viewLogs() {
-        axios({ url: "/api/viewLogs" }).then((resp) => {
+        axios({ url: "/api/servers" }).then((resp) => {
             rows = resp.data;
         });
     }
 
     function save() {
-        let url = selected.ID ? "/api/viewLog/edit" : "/api/viewLog/add";
+        let url = selected.ID ? "/api/server/edit" : "/api/server/add";
         axios({
             method: "post",
             url: url,
@@ -22,6 +23,10 @@
             viewLogs();
             selected = {};
         });
+    }
+
+    function add() {
+        selected = {};
     }
 
     onMount(() => {
@@ -41,7 +46,7 @@
                         {log.Note ? log.Note : log.ID}
                     </li>
                 {/each}
-                <li>添加</li>
+                <li on:click={add}>添加</li>
             </ul>
         </div>
         <div class="border w-full">
@@ -51,27 +56,33 @@
                     <td><input class="border" bind:value={selected.Note} /></td>
                 </tr>
                 <tr>
-                    <td>文件列表</td>
-                    <td><textarea class="border" bind:value={selected.Files} /></td>
+                    <td>地址</td>
+                    <td><input class="border" bind:value={selected.Addr} /></td>
                 </tr>
                 <tr>
-                    <td>换行</td>
+                    <td>用户名</td>
+                    <td><input class="border" bind:value={selected.User} /></td>
+                </tr>
+                <tr>
+                    <td>验证方式</td>
                     <td>
-                        <select class="border" bind:value={selected.Separator}>
-                            <option value={0}>Linux</option>
-                            <option value={1}>Windows</option>
-                            <option value={2}>mac</option>
+                        <select class="border" bind:value={selected.UsePwd}>
+                            <option value={false}>使用密钥</option>
+                            <option value={true}>使用密码</option>
                         </select>
                     </td>
                 </tr>
-                <tr>
-                    <td>行首匹配</td>
-                    <td><input class="border" bind:value={selected.LineMatch} /></td>
-                </tr>
-                <tr>
-                    <td>过滤器</td>
-                    <td><textarea class="border" bind:value={selected.Filter} /></td>
-                </tr>
+                {#if selected.UsePwd}
+                    <tr>
+                        <td>密码</td>
+                        <td><input class="border" bind:value={selected.Passwd} /></td>
+                    </tr>
+                {:else}
+                    <tr>
+                        <td>密钥</td>
+                        <td><textarea class="border" bind:value={selected.PrivateKey} /></td>
+                    </tr>
+                {/if}
                 <tr>
                     <td colspan="2" class="text-center">
                         {#if selected.ID}

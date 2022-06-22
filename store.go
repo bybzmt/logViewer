@@ -14,10 +14,8 @@ type ViewLog struct {
 	ID        uint64 `boltholdKey:"ID"`
 	Note      string
 	Files     string
-	Separator byte
+	Separator uint8
 	LineMatch string
-	Match     []string
+	Filter    string
 	Decoder   string
-	BeginTime int64
-	StopTime  int64
 }

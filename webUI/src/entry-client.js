@@ -2,6 +2,7 @@ import { goto, loadPage } from '$src/lib/core';
 import { initEvent } from '$src/lib/core/event';
 import routes from '$src/routes'
 import { writable } from 'svelte/store';
+import axios from "axios";
 
 async function render(target) {
 
@@ -16,6 +17,9 @@ async function render(target) {
     context.set('url', url)
     context.set('session', session)
     context.set('goto', goto(context))
+    context.set('axios', axios.create({
+        baseURL: 'http://127.0.0.1:8080'
+    }));
 
     let app;
 

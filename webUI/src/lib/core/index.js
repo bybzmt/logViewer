@@ -14,8 +14,6 @@ function match(routes, url) {
     return page
   }
 
-  if (routes.error) return routes.error
-
   return null
 }
 
