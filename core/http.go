@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"embed"
@@ -16,12 +16,12 @@ var uifiles embed.FS
 
 type Ui struct {
 	handler    http.ServeMux
-	httpServer http.Server
+	HttpServer http.Server
 	storeFile  string
 	store      *bolthold.Store
 }
 
-func (u *Ui) init() {
+func (u *Ui) Init() {
 	tfs, _ := fs.Sub(uifiles, "dist")
 	u.handler.Handle("/", http.FileServer(http.FS(tfs)))
 	u.handler.Handle("/api/servers", u.cross(u.apiServers))
@@ -33,7 +33,7 @@ func (u *Ui) init() {
 	u.handler.Handle("/api/viewLog/edit", u.cross(u.apiViewLogEdit))
 	u.handler.Handle("/api/viewLog/del", u.cross(u.apiViewLogDel))
 
-	u.httpServer.Handler = &u.handler
+	u.HttpServer.Handler = &u.handler
 
 	u.storeFile = "logViewer.db"
 

@@ -10,5 +10,8 @@ export default {
         "/servers": {
             page: () => import('./pages/servers.svelte'),
         },
+        "/logshow": {
+            page: () => import('./pages/logshow.svelte'),
+        },
     }
 }

@@ -1,12 +1,16 @@
 
 logViewer
-/*.db
-/*.log
+*.db
+*.log
+
+/gui/libs
+/gui/gui
+/server/server
 
 #js
-/dist
 /webUI/package-lock.json
 /webUI/node_modules
+/core/dist
 
 #vim临时文件
 *.swp

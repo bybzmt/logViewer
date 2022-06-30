@@ -1,4 +1,4 @@
-package main
+package core
 
 type ServerConfig struct {
 	ID         uint64 `boltholdKey:"ID"`
