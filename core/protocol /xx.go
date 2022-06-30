@@ -12,7 +12,7 @@ type CharArray struct {
 }
 
 const (
-	OP_RESET OP = iota
+	OP_EXIT OP = iota
 	OP_PING
 	MSG_PONG
 	//列出文件列表
@@ -27,6 +27,7 @@ const (
 	OP_LINE_REGEX
 	//打开文件
 	OP_OPEN
+	RESP_OPEN
 	//启动操作
 	OP_START
 	//响应结束
