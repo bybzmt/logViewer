@@ -1,5 +1,9 @@
 package protocol
 
+import (
+	"io"
+)
+
 type OP uint16
 
 type VarChar struct {
@@ -12,16 +16,20 @@ type CharArray struct {
 }
 
 const (
+	SEPARATOR_LINUX uint8 = iota
+	SEPARATOR_WIN
+	SEPARATOR_MAC
+)
+
+const (
 	OP_EXIT OP = iota
 	OP_PING
 	MSG_PONG
 	//列出文件列表
 	OP_LIST
+	RESP_LIST
 	//列表响应文件状态
 	MSG_STATE
-	//删除文件
-	OP_RM
-	MSG_OK
 	//行起始确定
 	OP_LINE_MATCH
 	OP_LINE_REGEX
@@ -63,3 +71,35 @@ const (
 	OP_COUNT
 	MSG_COUNT
 )
+
+func RespOpenFile(w io.Writer, err error) {
+	WriteOP(w, RESP_OPEN)
+	WriteError(w, err)
+}
+
+func ReadRespOpenFile(r io.Reader) error {
+	ExpectedOP(r, RESP_OPEN)
+	return ReadError(r)
+}
+
+func RespListDir(w io.Writer, files []string, err error) {
+	WriteOP(w, RESP_LIST)
+
+	WriteError(w, err)
+
+	if err == nil {
+		WriteStrings(w, files)
+	}
+}
+
+func ReadRespListDir(r io.Reader) ([]string, error) {
+	ExpectedOP(r, RESP_OPEN)
+
+	err := ReadError(r)
+	if err != nil {
+		return nil, err
+	}
+
+	strs := ReadStrings(r)
+	return strs, nil
+}
