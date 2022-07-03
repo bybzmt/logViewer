@@ -13,22 +13,35 @@ type ErrorAccessDenied error
 var UnexpectedOP = ErrorProtocol(errors.New("unexpected op"))
 var AccessDenied = ErrorAccessDenied(errors.New("access denied"))
 
-func ReadOP(r io.Reader) OP {
-	var op OP
+func ReadUint16(r io.Reader) uint16 {
+	var num uint16
 
-	err := binary.Read(r, binary.BigEndian, &op)
+	err := binary.Read(r, binary.BigEndian, &num)
 	if err != nil {
 		panic(ErrorIO(err))
 	}
 
-	return op
+	return num
+}
+
+func WriteUint16(w io.Writer, num uint16) {
+	err := binary.Write(w, binary.BigEndian, num)
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+}
+
+func ReadOP(r io.Reader) OP {
+	op := ReadUint16(r)
+	return OP(op)
 }
 
 func WriteOP(w io.Writer, op OP) {
-	err := binary.Write(w, binary.BigEndian, op)
-	if err != nil {
-		panic(ErrorIO(err))
-	}
+	WriteUint16(w, uint16(op))
+}
+
+func WriteOK(w io.Writer) {
+	WriteOP(w, OP_OK)
 }
 
 func ExpectedOP(r io.Reader, needs ...OP) OP {
@@ -48,18 +61,12 @@ func ReadString(r io.Reader) string {
 
 func ReadError(r io.Reader) error {
 	str := ReadString(r)
-	if str == "" {
-		return nil
-	}
 	return errors.New(str)
 }
 
 func WriteError(w io.Writer, err error) {
-	if err != nil {
-		WriteString(w, err.Error())
-	} else {
-		WriteString(w, "")
-	}
+	WriteOP(w, OP_ERR)
+	WriteString(w, err.Error())
 }
 
 func WriteString(w io.Writer, data string) {

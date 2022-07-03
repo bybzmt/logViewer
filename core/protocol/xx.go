@@ -16,87 +16,82 @@ type CharArray struct {
 }
 
 const (
-	SEPARATOR_LINUX uint8 = iota
-	SEPARATOR_WIN
-	SEPARATOR_MAC
-)
-
-const (
 	OP_EXIT OP = iota
+	OP_RESET
 	OP_PING
-	MSG_PONG
+	OP_PONG
+	OP_OK
+	OP_MSG
+	OP_ERR
 	//列出文件列表
 	OP_LIST
 	RESP_LIST
-	//列表响应文件状态
-	MSG_STATE
-	//行起始确定
-	OP_LINE_MATCH
-	OP_LINE_REGEX
 	//打开文件
 	OP_OPEN
-	RESP_OPEN
 	//启动操作
 	OP_START
 	//响应结束
-	MSG_END
-	//取消动作
-	OP_CANCEL
-	//时间段 start(int64) + end(int64)
-	OP_TIME
-	//seek uint64
-	OP_SEEK
-	//过滤字符串
-	OP_MATCH
-	OP_MATCH_OR
-	OP_REGEXP
-	//进度报告
-	OP_PROGRESS
-	MSG_PROGRESS
-	//查找方向
-	OP_REVERSE
-	//找查数量
-	OP_LIMIT
-	//输出速度
-	OP_SPEED
-	//跟随文件变化
-	OP_TAILF
-	OP_TOFILE
-	//安静模式
-	OP_QUIET
+	OP_STOP
+	//命中的行
 	MSG_LINE
-	//统计器
-	OP_COUNT_MATCH
-	OP_COUNT_REGEX
-	OP_COUNT
-	MSG_COUNT
+	//状态报告
+	OP_STAT
+	RESP_STAT
+	//时间段
+	SET_STARTTIME
+	SET_STOPTIME
+	//seek uint64
+	SET_SEEK
+	//最大行大小
+	SET_LINE_BUF
+	//找查数量
+	SET_LIMIT
+	//行时间解析器
+	SET_TIME_PARSER
+	//过滤字符串
+	ADD_MATCH
+	ADD_NOT_MATCH
+	ADD_REGEXP
+	ADD_NOT_REGEXP
+	//跟随文件变化
+	SET_TAILF
+	//输出速度
+	SET_SPEED
+	//安静模式
+	SET_QUIET
 )
 
 func RespOpenFile(w io.Writer, err error) {
-	WriteOP(w, RESP_OPEN)
-	WriteError(w, err)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteOP(w, OP_OK)
 }
 
 func ReadRespOpenFile(r io.Reader) error {
-	ExpectedOP(r, RESP_OPEN)
-	return ReadError(r)
+	op := ExpectedOP(r, OP_ERR, OP_OK)
+	if op == OP_ERR {
+		return ReadError(r)
+	}
+	return nil
 }
 
 func RespListDir(w io.Writer, files []string, err error) {
-	WriteOP(w, RESP_LIST)
-
-	WriteError(w, err)
-
-	if err == nil {
-		WriteStrings(w, files)
+	if err != nil {
+		WriteError(w, err)
+		return
 	}
+
+	WriteOP(w, RESP_LIST)
+	WriteStrings(w, files)
 }
 
 func ReadRespListDir(r io.Reader) ([]string, error) {
-	ExpectedOP(r, RESP_OPEN)
+	op := ExpectedOP(r, RESP_LIST, OP_ERR)
 
-	err := ReadError(r)
-	if err != nil {
+	if op == OP_ERR {
+		err := ReadError(r)
 		return nil, err
 	}
 
