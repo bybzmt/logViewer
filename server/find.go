@@ -8,8 +8,6 @@ import (
 	"bufio"
 )
 
-const MAX_LINE_BUF = 1024 * 128
-
 type Filter func([]byte) bool
 type TimeParser func([]byte) (int64, bool)
 
@@ -70,7 +68,7 @@ func (m *matcher) readLine() (*line, error) {
 	}
 }
 
-func (m *matcher) timeArea() (min int64, max int64, err error) {
+func (m *matcher) timeMinMax() (min int64, max int64, err error) {
 	var maxl, minl *line
 
 	maxl, err = m.maxLine()
@@ -78,7 +76,7 @@ func (m *matcher) timeArea() (min int64, max int64, err error) {
 		return
 	}
 
-	m.file.Seek(m.seek, os.SEEK_SET)
+	m.file.Seek(m.seek, io.SeekStart)
 	m.r.Reset(m.file)
 
 	minl, err = m.readLine()
@@ -86,14 +84,14 @@ func (m *matcher) timeArea() (min int64, max int64, err error) {
 		return
 	}
 
-	m.file.Seek(m.seek, os.SEEK_SET)
+	m.file.Seek(m.seek, io.SeekStart)
 	m.r.Reset(m.file)
 
 	return minl.time, maxl.time, nil
 }
 
 func (m *matcher) maxLine() (*line, error) {
-	m.file.Seek(-10*MAX_LINE_BUF, os.SEEK_END)
+	m.file.Seek(int64(-10*m.r.Size()), io.SeekEnd)
 	m.r.Reset(m.file)
 
 	var endline *line
@@ -117,7 +115,7 @@ func (m *matcher) maxLine() (*line, error) {
 }
 
 func (m *matcher) start() error {
-	min, max, err := m.timeArea()
+	min, max, err := m.timeMinMax()
 	if err != nil {
 		return err
 	}
@@ -147,7 +145,7 @@ func (m *matcher) start() error {
 		return err
 	}
 
-	m.file.Seek(seek, os.SEEK_SET)
+	m.file.Seek(seek, io.SeekStart)
 	m.r.Reset(m.file)
 
 	return nil
@@ -156,13 +154,13 @@ func (m *matcher) start() error {
 func (m *matcher) findSeek(min, max int64) (int64, error) {
 	diff := (max - min) / 2
 
-	if diff < MAX_LINE_BUF*10 {
+	if diff < int64(m.r.Size()*10) {
 		return min, nil
 	}
 
 	seek := min + diff
 
-	m.file.Seek(seek, os.SEEK_SET)
+	m.file.Seek(seek, io.SeekStart)
 	m.r.Reset(m.file)
 
 	l, err := m.readLine()
@@ -206,7 +204,7 @@ type matchResult struct {
 	lineCount  int64
 	matchCount int64
 	limit      int64
-	bufSize    int64
+	bufSize    int
 }
 
 func (m *matchResult) Len() int {
@@ -277,6 +275,8 @@ func (rs *matchResult) match() (*line, error) {
 
 func (rs *matchResult) init() error {
 	for i, m := range rs.all {
+		m.r = bufio.NewReaderSize(m.file, rs.bufSize)
+
 		err := m.start()
 		if err != nil {
 			if err == io.EOF {

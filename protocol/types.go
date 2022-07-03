@@ -6,12 +6,15 @@ import (
 	"io"
 )
 
+const DEFAULT_LINE_BUF = 1024 * 128
+
 type ErrorIO error
 type ErrorProtocol error
 type ErrorAccessDenied error
 
 var UnexpectedOP = ErrorProtocol(errors.New("unexpected op"))
 var AccessDenied = ErrorAccessDenied(errors.New("access denied"))
+var NotOpenFile = ErrorAccessDenied(errors.New("not open file"))
 
 func ReadUint16(r io.Reader) uint16 {
 	var num uint16
@@ -24,7 +27,25 @@ func ReadUint16(r io.Reader) uint16 {
 	return num
 }
 
+func ReadInt64(r io.Reader) int64 {
+	var num int64
+
+	err := binary.Read(r, binary.BigEndian, &num)
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+
+	return num
+}
+
 func WriteUint16(w io.Writer, num uint16) {
+	err := binary.Write(w, binary.BigEndian, num)
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+}
+
+func WriteInt64(w io.Writer, num int64) {
 	err := binary.Write(w, binary.BigEndian, num)
 	if err != nil {
 		panic(ErrorIO(err))
