@@ -2,7 +2,7 @@ package main
 
 import (
 	"io/fs"
-	"logViewer/core/protocol"
+	"logViewer/protocol"
 	"os"
 	"strings"
 )

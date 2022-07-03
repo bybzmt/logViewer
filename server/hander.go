@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"bufio"
-	"logViewer/core/protocol"
+	"logViewer/protocol"
 )
 
 type oPhandler func(ctx *matchCtx)

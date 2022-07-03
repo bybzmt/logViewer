@@ -10,7 +10,7 @@ logViewer
 #js
 /webUI/package-lock.json
 /webUI/node_modules
-/core/dist
+/client/dist
 
 #vim临时文件
 *.swp
