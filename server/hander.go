@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net"
 
@@ -15,7 +16,9 @@ type matchCtx struct {
 	r      *bufio.Reader
 	w      *bufio.Writer
 	result matchResult
-	msg    chan int
+	msg    chan []byte
+	err    chan error
+	op     chan protocol.OP
 	run    bool
 	mode   uint8
 }
@@ -57,14 +60,13 @@ func (s *matchServer) init() {
 }
 
 func (s *matchServer) serviceWapper(c net.Conn) {
-	defer c.Close()
-
 	ctx := matchCtx{
 		c:   c,
 		r:   bufio.NewReader(c),
 		w:   bufio.NewWriter(c),
 		run: true,
 	}
+	defer ctx.close()
 
 	defer func() {
 		err := recover()
@@ -76,29 +78,66 @@ func (s *matchServer) serviceWapper(c net.Conn) {
 	s.service(&ctx)
 }
 
+func (s *matchServer) getHander(ctx *matchCtx, op protocol.OP) oPhandler {
+	var h oPhandler
+	var ok bool
+
+	switch ctx.mode {
+	case 0:
+		h, ok = s.handler[op]
+	case 1:
+		h, ok = s.setting[op]
+	case 2:
+		h, ok = s.matching[op]
+	}
+
+	if !ok {
+		panic(protocol.UnexpectedOP)
+	}
+
+	return h
+}
+
 func (s *matchServer) service(ctx *matchCtx) {
-	defer ctx.close()
+
+	go func() {
+		defer func() {
+			err := recover()
+			if err != nil {
+				if e, ok := err.(error); ok {
+					ctx.err <- e
+				} else {
+					log.Println(err)
+				}
+			}
+		}()
+
+		for ctx.run {
+			op := protocol.ReadOP(ctx.r)
+			ctx.op <- op
+		}
+	}()
 
 	for ctx.run {
-		op := protocol.ReadOP(ctx.r)
+		select {
+		case e := <-ctx.err:
+			if e == io.EOF {
+				protocol.WriteOP(ctx.w, protocol.OP_EXIT)
+			} else {
+				protocol.WriteError(ctx.w, e)
+			}
+			ctx.run = false
 
-		var h oPhandler
-		var ok bool
+		case op := <-ctx.op:
+			h := s.getHander(ctx, op)
+			h(ctx)
 
-		switch ctx.mode {
-		case 0:
-			h, ok = s.handler[op]
-		case 1:
-			h, ok = s.setting[op]
-		case 2:
-			h, ok = s.matching[op]
+		case d := <-ctx.msg:
+			_, err := ctx.w.Write(d)
+			if err != nil {
+				panic(err)
+			}
 		}
-
-		if !ok {
-			panic(protocol.UnexpectedOP)
-		}
-
-		h(ctx)
 
 		if err := ctx.w.Flush(); err != nil {
 			panic(protocol.ErrorIO(err))
@@ -107,9 +146,11 @@ func (s *matchServer) service(ctx *matchCtx) {
 }
 
 func (ctx *matchCtx) close() {
-	for _, m := range ctx.result.all {
-		m.file.Close()
-	}
+	defer ctx.c.Close()
+
+	ctx.run = false
+
+	ctx.result.close()
 }
 
 func op_ping(ctx *matchCtx) {
@@ -123,22 +164,25 @@ func op_exit(ctx *matchCtx) {
 func op_list(ctx *matchCtx) {
 	file := protocol.ReadString(ctx.r)
 	files, err := listDirFiles(file)
+	if err != nil {
+		ctx.err <- err
+		return
+	}
 
-	protocol.RespListDir(ctx.w, files, err)
+	protocol.RespListDir(ctx.w, files)
 }
 
 func op_open(ctx *matchCtx) {
-	ctx.mode = 1
-
 	file := protocol.ReadString(ctx.r)
 	f, err := openFile(file)
 	if err != nil {
-		protocol.WriteError(ctx.w, err)
+		ctx.err <- err
+		return
 	}
 
+	ctx.mode = 1
 	match := &matcher{file: f}
 	ctx.result.all = append(ctx.result.all, match)
-	protocol.WriteOP(ctx.w, protocol.OP_OK)
 }
 
 func op_set_starttime(ctx *matchCtx) {
@@ -162,16 +206,10 @@ func op_set_buf(ctx *matchCtx) {
 }
 
 func op_set_seek(ctx *matchCtx) {
+	i := len(ctx.result.all) - 1
+
 	num := protocol.ReadInt64(ctx.r)
-
-	i := len(ctx.result.all)
-	if i == 0 {
-		protocol.WriteError(ctx.w, protocol.NotOpenFile)
-		return
-	}
-
 	ctx.result.all[i].seek = num
-	protocol.WriteOK(ctx.w)
 }
 
 func op_set_time_parser(ctx *matchCtx) {
@@ -182,11 +220,10 @@ func op_set_time_parser(ctx *matchCtx) {
 
 	reg, err := perlRegexp(expr)
 	if err != nil {
-		protocol.WriteError(ctx.w, err)
+		ctx.err <- err
 		return
 	}
 
-	protocol.WriteOK(ctx.w)
 	ctx.result.all[i].timeParser = timeParserRegexp(reg, timeLayout)
 }
 
@@ -194,7 +231,6 @@ func op_add_match(ctx *matchCtx) {
 	i := len(ctx.result.all) - 1
 
 	strs := protocol.ReadStrings(ctx.r)
-	protocol.WriteOK(ctx.w)
 
 	ctx.result.all[i].filters = append(ctx.result.all[i].filters, filterContains(strs))
 }
@@ -203,7 +239,6 @@ func op_add_not_match(ctx *matchCtx) {
 	i := len(ctx.result.all) - 1
 
 	strs := protocol.ReadStrings(ctx.r)
-	protocol.WriteOK(ctx.w)
 
 	ctx.result.all[i].filters = append(ctx.result.all[i].filters, filterNot(filterContains(strs)))
 }
@@ -214,11 +249,10 @@ func op_add_regexp(ctx *matchCtx) {
 	expr := protocol.ReadString(ctx.r)
 	reg, err := perlRegexp(expr)
 	if err != nil {
-		protocol.WriteError(ctx.w, err)
+		ctx.err <- err
 		return
 	}
 
-	protocol.WriteOK(ctx.w)
 	ctx.result.all[i].filters = append(ctx.result.all[i].filters, filterRegexp(reg))
 }
 
@@ -228,18 +262,45 @@ func op_add_not_regexp(ctx *matchCtx) {
 	expr := protocol.ReadString(ctx.r)
 	reg, err := perlRegexp(expr)
 	if err != nil {
-		protocol.WriteError(ctx.w, err)
+		ctx.err <- err
 		return
 	}
 
-	protocol.WriteOK(ctx.w)
 	ctx.result.all[i].filters = append(ctx.result.all[i].filters, filterNot(filterRegexp(reg)))
 }
 
 func op_start(ctx *matchCtx) {
 	ctx.mode = 2
 
-	startMatch(&ctx.result, ctx.w)
+	err := ctx.result.init()
+	if err != nil {
+		ctx.err <- err
+		return
+	}
+
+	protocol.WriteOK(ctx.w)
+
+	go func() {
+		defer func() {
+			err := recover()
+			if err != nil {
+				if e, ok := err.(error); ok {
+					ctx.err <- e
+				} else {
+					log.Println(err)
+				}
+			}
+		}()
+
+		for ctx.run {
+			l, err := ctx.result.match()
+			if err != nil {
+				ctx.err <- err
+				return
+			}
+			ctx.msg <- l.data
+		}
+	}()
 }
 
 func op_stat(ctx *matchCtx) {

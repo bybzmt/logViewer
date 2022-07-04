@@ -30,6 +30,11 @@ type line struct {
 	data []byte
 }
 
+func (m *matcher) reset() {
+	m.r.Reset(m.file)
+	m.line = nil
+}
+
 func (m *matcher) readLine() (*line, error) {
 	for {
 		data, prefix, err := m.r.ReadLine()
@@ -77,7 +82,7 @@ func (m *matcher) timeMinMax() (min int64, max int64, err error) {
 	}
 
 	m.file.Seek(m.seek, io.SeekStart)
-	m.r.Reset(m.file)
+	m.reset()
 
 	minl, err = m.readLine()
 	if err != nil {
@@ -85,14 +90,14 @@ func (m *matcher) timeMinMax() (min int64, max int64, err error) {
 	}
 
 	m.file.Seek(m.seek, io.SeekStart)
-	m.r.Reset(m.file)
+	m.reset()
 
 	return minl.time, maxl.time, nil
 }
 
 func (m *matcher) maxLine() (*line, error) {
 	m.file.Seek(int64(-10*m.r.Size()), io.SeekEnd)
-	m.r.Reset(m.file)
+	m.reset()
 
 	var endline *line
 
@@ -146,7 +151,7 @@ func (m *matcher) start() error {
 	}
 
 	m.file.Seek(seek, io.SeekStart)
-	m.r.Reset(m.file)
+	m.reset()
 
 	return nil
 }
@@ -161,7 +166,7 @@ func (m *matcher) findSeek(min, max int64) (int64, error) {
 	seek := min + diff
 
 	m.file.Seek(seek, io.SeekStart)
-	m.r.Reset(m.file)
+	m.reset()
 
 	l, err := m.readLine()
 	if err != nil {
@@ -193,9 +198,6 @@ func (m *matcher) matchByTime() (*line, error) {
 		return l, nil
 	}
 }
-func (m *matcher) close() error {
-	return m.file.Close()
-}
 
 type matchResult struct {
 	line       []*line
@@ -224,8 +226,6 @@ func (rs *matchResult) matchByTime() (*line, *matcher, error) {
 
 	l, err := rs.matcher[0].matchByTime()
 	if err != nil {
-		rs.matcher[0].close()
-
 		rs.line = rs.line[1:]
 		rs.matcher = rs.matcher[1:]
 
@@ -274,7 +274,7 @@ func (rs *matchResult) match() (*line, error) {
 }
 
 func (rs *matchResult) init() error {
-	for i, m := range rs.all {
+	for _, m := range rs.all {
 		m.r = bufio.NewReaderSize(m.file, rs.bufSize)
 
 		err := m.start()
@@ -293,35 +293,15 @@ func (rs *matchResult) init() error {
 			return err
 		}
 
-		rs.line[i] = l
-		rs.matcher[i] = m
+		rs.line = append(rs.line, l)
+		rs.matcher = append(rs.matcher, m)
 	}
 
 	return nil
 }
 
-func startMatch(ms *matchResult, w io.Writer) {
-	var rs = matchResult{}
-
-	err := rs.init()
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	for {
-		l, err := rs.match()
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.Write(l.data)
-
-		if rs.limit > 0 {
-			if rs.matchCount >= rs.limit {
-				return
-			}
-		}
+func (rs *matchResult) close() {
+	for _, m := range rs.all {
+		m.file.Close()
 	}
 }

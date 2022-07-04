@@ -32,8 +32,6 @@ const (
 	OP_START
 	//响应结束
 	OP_STOP
-	//命中的行
-	MSG_LINE
 	//状态报告
 	OP_STAT
 	RESP_STAT
@@ -77,12 +75,7 @@ func ReadRespOpenFile(r io.Reader) error {
 	return nil
 }
 
-func RespListDir(w io.Writer, files []string, err error) {
-	if err != nil {
-		WriteError(w, err)
-		return
-	}
-
+func RespListDir(w io.Writer, files []string) {
 	WriteOP(w, RESP_LIST)
 	WriteStrings(w, files)
 }
