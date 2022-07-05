@@ -24,6 +24,10 @@
         });
     }
 
+    function add() {
+        selected = {};
+    }
+
     onMount(() => {
         viewLogs();
     });
@@ -41,7 +45,7 @@
                         {log.Note ? log.Note : log.ID}
                     </li>
                 {/each}
-                <li>添加</li>
+                <li on:click={add}>添加</li>
             </ul>
         </div>
         <div class="border w-full">
@@ -55,22 +59,20 @@
                     <td><textarea class="border" bind:value={selected.Files} /></td>
                 </tr>
                 <tr>
-                    <td>换行</td>
-                    <td>
-                        <select class="border" bind:value={selected.Separator}>
-                            <option value={0}>Linux</option>
-                            <option value={1}>Windows</option>
-                            <option value={2}>mac</option>
-                        </select>
-                    </td>
+                    <td>时间正则</td>
+                    <td><input class="border" bind:value={selected.TimeRegex} /></td>
                 </tr>
                 <tr>
-                    <td>行首匹配</td>
-                    <td><input class="border" bind:value={selected.LineMatch} /></td>
+                    <td>时间格式</td>
+                    <td><input class="border" bind:value={selected.TimeLayout} /></td>
                 </tr>
                 <tr>
-                    <td>过滤器</td>
-                    <td><textarea class="border" bind:value={selected.Filter} /></td>
+                    <td>包含</td>
+                    <td><textarea class="border" bind:value={selected.Contains} /></td>
+                </tr>
+                <tr>
+                    <td>正则</td>
+                    <td><textarea class="border" bind:value={selected.Regex} /></td>
                 </tr>
                 <tr>
                     <td colspan="2" class="text-center">

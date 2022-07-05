@@ -18,7 +18,7 @@ async function render(target) {
     context.set('session', session)
     context.set('goto', goto(context))
     context.set('axios', axios.create({
-        baseURL: 'http://127.0.0.1:8080'
+        baseURL: 'http://' + API_BASE
     }));
 
     let app;

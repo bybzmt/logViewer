@@ -67,12 +67,14 @@ func RespOpenFile(w io.Writer, err error) {
 	WriteOP(w, OP_OK)
 }
 
-func ReadRespOpenFile(r io.Reader) error {
+func ReadRespOpenFile(r io.Reader) (file_id uint16, err error) {
 	op := ExpectedOP(r, OP_ERR, OP_OK)
 	if op == OP_ERR {
-		return ReadError(r)
+		return 0, ReadError(r)
 	}
-	return nil
+
+	file_id = ReadUint16(r)
+	return
 }
 
 func RespListDir(w io.Writer, files []string) {

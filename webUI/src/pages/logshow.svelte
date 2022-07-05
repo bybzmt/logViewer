@@ -6,22 +6,44 @@
     let rows = [];
     let selected = {};
 
+    let ws;
+    let msgs = [];
+
     function viewLogs() {
         axios({ url: "/api/viewLogs" }).then((resp) => {
             rows = resp.data;
         });
     }
 
-    function save() {
-        let url = selected.ID ? "/api/viewLog/edit" : "/api/viewLog/add";
-        axios({
-            method: "post",
-            url: url,
-            data: new URLSearchParams(selected),
-        }).then(() => {
-            viewLogs();
-            selected = {};
-        });
+    function search() {
+        ws = new WebSocket("ws://" + API_BASE + "/api/logs");
+        ws.onopen = () => {
+            console.log("open");
+
+            for (let i = 0; i < 1000; i++) {
+                ws.send(i);
+            }
+        };
+        ws.onclose = () => {
+            console.log("close");
+            ws = null;
+        };
+        ws.onerror = () => {
+            console.log("error");
+        };
+        ws.onmessage = (evt) => {
+            console.log("onmessage");
+
+            msgs.push(evt.data);
+            if (msgs.length > 1000) {
+                msgs = msgs.slice(-1000);
+            } else {
+                msgs = msgs;
+            }
+        };
+    }
+    function cancel() {
+        ws.close();
     }
 
     onMount(() => {
@@ -48,15 +70,23 @@
             <div>
                 <input class="border w-[10em]" placeholder="开始时间" />
                 <input class="border w-[10em]" placeholder="结束时间" />
-                <input class="border w-[5em]" placeholder="偏移位置" />
                 <select>
                     <option>开头</option>
                     <option>未尾</option>
                 </select>
                 <input class="border w-[5em]" placeholder="显示数量" />
-                <button>开始</button>
+                <input class="border w-[5em]" placeholder="匹配" />
+                {#if ws == null}
+                    <button on:click={search}>开始</button>
+                {:else}
+                    <button on:click={cancel}>取消</button>
+                {/if}
             </div>
-            <div class="border">1</div>
+            <div class="border">
+                {#each msgs as msg}
+                    <p>{msg}</p>
+                {/each}
+            </div>
         </div>
     </div>
 </Layout>

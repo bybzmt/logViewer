@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/websocket"
 	"github.com/timshannon/bolthold"
 )
 
@@ -32,6 +33,7 @@ func (u *Ui) Init() {
 	u.handler.Handle("/api/viewLog/add", u.cross(u.apiViewLogAdd))
 	u.handler.Handle("/api/viewLog/edit", u.cross(u.apiViewLogEdit))
 	u.handler.Handle("/api/viewLog/del", u.cross(u.apiViewLogDel))
+	u.handler.Handle("/api/logs", u.cross(u.apiLogs))
 
 	u.HttpServer.Handler = &u.handler
 
@@ -152,12 +154,10 @@ func (u *Ui) apiViewLogAdd(w http.ResponseWriter, r *http.Request) {
 	rs.ID = uint64(id)
 	rs.Note = r.FormValue("Note")
 	rs.Files = r.FormValue("Files")
-	t2, _ := strconv.Atoi(r.FormValue("Separator"))
-	rs.Separator = uint8(t2)
-
-	rs.LineMatch = r.FormValue("LineMatch")
-	rs.Filter = r.FormValue("Filter")
-	rs.Decoder = r.FormValue("Decoder")
+	rs.TimeRegex = r.FormValue("TimeRegex")
+	rs.TimeLayout = r.FormValue("TimeLayout")
+	rs.Contains = r.FormValue("Contains")
+	rs.Regex = r.FormValue("Regex")
 
 	err := u.store.Insert(bolthold.NextSequence(), &rs)
 	if err != nil {
@@ -175,11 +175,10 @@ func (u *Ui) apiViewLogEdit(w http.ResponseWriter, r *http.Request) {
 	rs.ID = uint64(id)
 	rs.Note = r.FormValue("Note")
 	rs.Files = r.FormValue("Files")
-	t2, _ := strconv.Atoi(r.FormValue("Separator"))
-	rs.Separator = uint8(t2)
-	rs.LineMatch = r.FormValue("LineMatch")
-	rs.Filter = r.FormValue("Filter")
-	rs.Decoder = r.FormValue("Decoder")
+	rs.TimeRegex = r.FormValue("TimeRegex")
+	rs.TimeLayout = r.FormValue("TimeLayout")
+	rs.Contains = r.FormValue("Contains")
+	rs.Regex = r.FormValue("Regex")
 
 	err := u.store.Update(rs.ID, rs)
 	if err != nil {
@@ -201,4 +200,42 @@ func (u *Ui) apiViewLogDel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte("ok"))
+}
+
+func CheckOrigin(r *http.Request) bool {
+	return true
+}
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin:     CheckOrigin,
+}
+
+func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+
+	for {
+		messageType, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if messageType == websocket.CloseMessage {
+			return
+		}
+
+		if err := conn.WriteMessage(messageType, p); err != nil {
+			log.Println(err)
+			return
+		}
+	}
+
 }

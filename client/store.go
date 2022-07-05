@@ -11,11 +11,12 @@ type ServerConfig struct {
 }
 
 type ViewLog struct {
-	ID        uint64 `boltholdKey:"ID"`
-	Note      string
-	Files     string
-	Separator uint8
-	LineMatch string
-	Filter    string
-	Decoder   string
+	ID         uint64 `boltholdKey:"ID"`
+	Note       string
+	Files      string
+	TimeRegex  string
+	TimeLayout string
+	Contains   string
+	Regex      string
+	Decoder    string
 }
