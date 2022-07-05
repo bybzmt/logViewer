@@ -20,6 +20,7 @@ func main() {
 	fc.String(&cli.start, "", "start", "start time")
 	fc.String(&cli.stop, "", "stop", "stop time")
 	fc.StringSlice(&cli.matchs, "", "match", "match keyword")
+	fc.Int(&cli.limit, "", "limit", "max match data num")
 
 	flaggy.AttachSubcommand(ft, 1)
 	flaggy.AttachSubcommand(fc, 1)

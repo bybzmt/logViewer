@@ -133,19 +133,16 @@ func (m *matcher) start() error {
 		return io.EOF
 	}
 
-	if m.startTime >= min && min < m.endTime {
+	if m.startTime <= min && min < m.endTime {
 		return nil
 	}
 
-	seek_min := m.seek
-
-	st, err := m.file.Stat()
+	seek_max, err := m.file.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
 	}
-	seek_max := st.Size()
 
-	seek, err := m.findSeek(seek_min, seek_max)
+	seek, err := m.findSeek(m.seek, seek_max)
 	if err != nil {
 		return err
 	}

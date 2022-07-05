@@ -16,6 +16,7 @@ type cliServer struct {
 	matchs     []string
 	start      string
 	stop       string
+	limit      int
 }
 
 func (cli *cliServer) run() {
@@ -29,18 +30,18 @@ func (cli *cliServer) run() {
 	}
 
 	if cli.start == "" {
-		cli.start = time.Unix(0, 0).Format("2006-01-02T15:04:05")
+		cli.start = time.Unix(0, 0).Format("2006-01-02T15:04:05Z07:00")
 	}
 	if cli.stop == "" {
-		cli.stop = time.Now().Format("2006-01-02T15:04:05")
+		cli.stop = time.Now().Format("2006-01-02T15:04:05Z07:00")
 	}
 
-	s1, err := time.Parse("2006-01-02T15:04:05", cli.start)
+	s1, err := time.Parse("2006-01-02T15:04:05Z07:00", cli.start)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	s2, err := time.Parse("2006-01-02T15:04:05", cli.stop)
+	s2, err := time.Parse("2006-01-02T15:04:05Z07:00", cli.stop)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -102,5 +103,12 @@ func (cli *cliServer) run() {
 		}
 
 		fmt.Println(string(l.data))
+
+		if cli.limit > 0 {
+			cli.limit--
+			if cli.limit == 0 {
+				break
+			}
+		}
 	}
 }
