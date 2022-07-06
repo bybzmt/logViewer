@@ -214,6 +214,24 @@ var upgrader = websocket.Upgrader{
 
 func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 
+	rs := matchResult{
+		addr: "127.0.0.2:7000",
+	}
+	err := rs.dial()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	defer rs.close()
+
+	err = rs.open()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -221,20 +239,35 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	go rs.run()
+
+	go func() {
+		for {
+			messageType, _, err := conn.ReadMessage()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			if messageType == websocket.CloseMessage {
+				return
+			}
+		}
+	}()
+
 	for {
-		messageType, p, err := conn.ReadMessage()
-		if err != nil {
-			log.Println(err)
+		select {
+		case err := <-rs.err:
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
+				log.Println(err)
+			}
 			return
-		}
 
-		if messageType == websocket.CloseMessage {
-			return
-		}
-
-		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return
+		case data := <-rs.msg:
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				log.Println(err)
+				return
+			}
 		}
 	}
 

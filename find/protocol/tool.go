@@ -1,8 +1,7 @@
-package main
+package protocol
 
 import (
 	"io/fs"
-	"logViewer/protocol"
 	"os"
 	"strings"
 )
@@ -14,7 +13,7 @@ func openFile(file string, pre []string) (*os.File, error) {
 		}
 	}
 
-	return nil, protocol.AccessDenied
+	return nil, AccessDenied
 }
 
 func listDirFiles(dir string, pre []string) ([]string, error) {
@@ -25,5 +24,5 @@ func listDirFiles(dir string, pre []string) ([]string, error) {
 		}
 	}
 
-	return nil, protocol.AccessDenied
+	return nil, AccessDenied
 }

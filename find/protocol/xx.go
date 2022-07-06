@@ -25,7 +25,6 @@ const (
 	OP_ERR
 	//列出文件列表
 	OP_LIST
-	RESP_LIST
 	//打开文件
 	OP_OPEN
 	//启动操作
@@ -38,8 +37,6 @@ const (
 	//时间段
 	SET_STARTTIME
 	SET_STOPTIME
-	//seek uint64
-	SET_SEEK
 	//最大行大小
 	SET_LINE_BUF
 	//找查数量
@@ -59,12 +56,9 @@ const (
 	SET_QUIET
 )
 
-func RespOpenFile(w io.Writer, err error) {
-	if err != nil {
-		WriteError(w, err)
-		return
-	}
+func RespOpenFile(w io.Writer, fid uint16) {
 	WriteOP(w, OP_OK)
+	WriteUint16(w, fid)
 }
 
 func ReadRespOpenFile(r io.Reader) (file_id uint16, err error) {
@@ -78,12 +72,12 @@ func ReadRespOpenFile(r io.Reader) (file_id uint16, err error) {
 }
 
 func RespListDir(w io.Writer, files []string) {
-	WriteOP(w, RESP_LIST)
+	WriteOP(w, OP_OK)
 	WriteStrings(w, files)
 }
 
 func ReadRespListDir(r io.Reader) ([]string, error) {
-	op := ExpectedOP(r, RESP_LIST, OP_ERR)
+	op := ExpectedOP(r, OP_OK, OP_ERR)
 
 	if op == OP_ERR {
 		err := ReadError(r)

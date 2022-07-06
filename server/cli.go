@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"logViewer/find"
 	"os"
 	"time"
 )
@@ -20,7 +21,7 @@ type cliServer struct {
 }
 
 func (cli *cliServer) run() {
-	var rs matchResult
+	var rs find.Matcher
 
 	if cli.timeLayout == "" {
 		log.Fatalln("time Layout can not empty")
@@ -46,14 +47,14 @@ func (cli *cliServer) run() {
 		log.Fatalln(err)
 	}
 
-	reg, err := perlRegexp(cli.timeRegex)
+	reg, err := find.PerlRegexp(cli.timeRegex)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	defer rs.close()
+	defer rs.Close()
 
-	rs.bufSize = 1024 * 16
+	rs.BufSize = 1024 * 16
 
 	cli.files, err = fs.Glob(os.DirFS("./"), cli.glob)
 	if err != nil {
@@ -71,38 +72,39 @@ func (cli *cliServer) run() {
 	log.Println(" stop:", s2.Format(time.RFC3339))
 	log.Println("keyword:", cli.matchs)
 
+	rs.StartTime = s1.Unix()
+	rs.EndTime = s2.Unix()
+
 	for _, name := range cli.files {
 		f, err := os.Open(name)
 		if err != nil {
 			log.Fatalln(err)
 		} else {
-			m := &matcher{
-				file:       f,
-				timeParser: timeParserRegexp(reg, cli.timeLayout),
-				startTime:  s1.Unix(),
-				endTime:    s2.Unix(),
+			m := &find.File{
+				File:       f,
+				TimeParser: find.TimeParserRegexp(reg, cli.timeLayout),
 			}
 
 			if len(cli.matchs) > 0 {
-				m.filters = append(m.filters, filterContains(cli.matchs))
+				m.Filters = append(m.Filters, find.FilterContains(cli.matchs))
 			}
 
-			rs.all = append(rs.all, m)
+			rs.All = append(rs.All, m)
 		}
 	}
 
-	err = rs.init()
+	err = rs.Init()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	for {
-		l, err := rs.match()
+		data, err := rs.Match()
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		fmt.Println(string(l.data))
+		fmt.Println(string(data))
 
 		if cli.limit > 0 {
 			cli.limit--

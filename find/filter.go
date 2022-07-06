@@ -1,4 +1,4 @@
-package main
+package find
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func perlRegexp(reg string) (*regexp.Regexp, error) {
+func PerlRegexp(reg string) (*regexp.Regexp, error) {
 	r, e := syntax.Parse(reg, syntax.Perl)
 	if e != nil {
 		return nil, e
@@ -16,7 +16,7 @@ func perlRegexp(reg string) (*regexp.Regexp, error) {
 	return regexp.Compile(r.String())
 }
 
-func timeParserRegexp(reg *regexp.Regexp, timeLayout string) TimeParser {
+func TimeParserRegexp(reg *regexp.Regexp, timeLayout string) TimeParser {
 	return func(b []byte) (int64, bool) {
 		f := reg.Find(b)
 		if f == nil {
@@ -32,13 +32,13 @@ func timeParserRegexp(reg *regexp.Regexp, timeLayout string) TimeParser {
 	}
 }
 
-func filterRegexp(reg *regexp.Regexp) Filter {
+func FilterRegexp(reg *regexp.Regexp) Filter {
 	return func(b []byte) bool {
 		return reg.Match(b)
 	}
 }
 
-func filterContains(strs []string) Filter {
+func FilterContains(strs []string) Filter {
 	return func(b []byte) bool {
 		for _, str := range strs {
 			if bytes.Contains(b, []byte(str)) {
@@ -50,8 +50,8 @@ func filterContains(strs []string) Filter {
 	}
 }
 
-func filterNot(fn Filter) Filter {
+func FilterNot(fn Filter) Filter {
 	return func(b []byte) bool {
-		return fn(b) == false
+		return !fn(b)
 	}
 }

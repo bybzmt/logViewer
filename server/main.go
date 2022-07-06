@@ -1,16 +1,18 @@
 package main
 
 import (
+	"logViewer/find/protocol"
+
 	"github.com/integrii/flaggy"
 )
 
 func main() {
-	tcp := matchServer{}
+	tcp := protocol.MatchServer{}
 	cli := cliServer{}
 
 	ft := flaggy.NewSubcommand("tcp")
-	ft.String(&tcp.addr, "", "addr", "listen addr:port")
-	ft.StringSlice(&tcp.dirs, "", "dir", "limit dir")
+	ft.String(&tcp.Addr, "", "addr", "listen addr:port")
+	ft.StringSlice(&tcp.Dirs, "", "dir", "limit dir")
 
 	fc := flaggy.NewSubcommand("cli")
 	//fc.StringSlice(&cli.files, "", "file", "open file")
