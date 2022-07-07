@@ -76,21 +76,16 @@ func (cli *cliServer) run() {
 	rs.EndTime = s2.Unix()
 
 	for _, name := range cli.files {
-		f, err := os.Open(name)
-		if err != nil {
-			log.Fatalln(err)
-		} else {
-			m := &find.File{
-				File:       f,
-				TimeParser: find.TimeParserRegexp(reg, cli.timeLayout),
-			}
-
-			if len(cli.matchs) > 0 {
-				m.Filters = append(m.Filters, find.FilterContains(cli.matchs))
-			}
-
-			rs.All = append(rs.All, m)
+		m := find.File{
+			Name:       name,
+			TimeParser: find.TimeParserRegexp(reg, cli.timeLayout),
 		}
+
+		if len(cli.matchs) > 0 {
+			m.Filters = append(m.Filters, find.FilterContains(cli.matchs))
+		}
+
+		rs.All = append(rs.All, m)
 	}
 
 	err = rs.Init()

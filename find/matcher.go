@@ -4,19 +4,21 @@ import (
 	"io"
 )
 
+const DEFAULT_LINE_BUF = 1024 * 128
+
 type Matcher struct {
 	results    results
-	All        []*File
+	All        []File
 	StartTime  int64
 	EndTime    int64
 	MatchCount int64
-	Limit      int64
-	BufSize    uint16
+	Limit      uint16
+	BufSize    uint32
 }
 
 func (rs *Matcher) Match() ([]byte, error) {
 	if rs.Limit > 0 {
-		if rs.MatchCount >= rs.Limit {
+		if rs.MatchCount >= int64(rs.Limit) {
 			return nil, io.EOF
 		}
 	}
@@ -47,6 +49,10 @@ func (rs *Matcher) Match() ([]byte, error) {
 }
 
 func (rs *Matcher) Init() error {
+	if rs.BufSize == 0 {
+		rs.BufSize = DEFAULT_LINE_BUF
+	}
+
 	for _, m := range rs.All {
 		m.startTime = rs.StartTime
 		m.endTime = rs.EndTime
@@ -70,7 +76,7 @@ func (rs *Matcher) Init() error {
 
 		rs.results = append(rs.results, result{
 			line: l,
-			file: m,
+			file: &m,
 		})
 	}
 

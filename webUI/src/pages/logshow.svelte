@@ -16,6 +16,8 @@
     }
 
     function search() {
+        msgs = [];
+
         ws = new WebSocket("ws://" + API_BASE + "/api/logs");
         ws.onopen = () => {
             console.log("open");

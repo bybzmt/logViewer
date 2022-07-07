@@ -22,7 +22,8 @@ type File struct {
 	tailf      bool
 	LineCount  int64
 	MatchCount int64
-	bufSize    uint16
+	missLine   int
+	bufSize    uint32
 	line       *line
 }
 
@@ -67,6 +68,8 @@ func (m *File) readLine() (*line, error) {
 				return old, nil
 			}
 		} else {
+			m.missLine++
+
 			if m.line != nil {
 				m.line.data = append(m.line.data, data...)
 			}

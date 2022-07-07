@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
+
+	"logViewer/find/tcp"
 
 	"github.com/gorilla/websocket"
 	"github.com/timshannon/bolthold"
@@ -214,18 +217,38 @@ var upgrader = websocket.Upgrader{
 
 func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 
-	rs := matchResult{
-		addr: "127.0.0.2:7000",
+	//sStart := r.Form.Get("start")
+	//sEnd := r.Form.Get("end")
+	slimit := r.Form.Get("limit")
+
+	limit, _ := strconv.Atoi(slimit)
+	if limit < 1 {
+		limit = 10
 	}
-	err := rs.dial()
+
+	addr := "127.0.0.2:7000"
+	rs, err := tcp.Dial(addr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	defer rs.close()
+	defer rs.Close()
 
-	err = rs.open()
+	f := tcp.Match{
+		StartTime: 0,
+		Files: []tcp.File{
+			{
+				Name:       "/home/by/文档/code/bybzmt/logViewer/server/log/20220615.log",
+				TimeRegex:  `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00`,
+				TimeLayout: "2006-01-02T15:04:05Z07:00",
+			},
+		},
+		EndTime: time.Now().Unix(),
+		Limit:   uint16(limit),
+	}
+
+	err = rs.Open(&f)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -239,36 +262,20 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	go rs.run()
-
-	go func() {
-		for {
-			messageType, _, err := conn.ReadMessage()
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
-			if messageType == websocket.CloseMessage {
-				return
-			}
-		}
-	}()
-
 	for {
-		select {
-		case err := <-rs.err:
+		d, err := rs.Read()
+		if err != nil {
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
 				log.Println(err)
 			}
-			return
+			break
+		}
 
-		case data := <-rs.msg:
-			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Println(err)
-				return
-			}
+		if err := conn.WriteMessage(websocket.TextMessage, d); err != nil {
+			log.Println(err)
+			break
 		}
 	}
 
+	time.Sleep(time.Second)
 }

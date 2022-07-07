@@ -1,13 +1,13 @@
 package main
 
 import (
-	"logViewer/find/protocol"
+	"logViewer/find/tcp"
 
 	"github.com/integrii/flaggy"
 )
 
 func main() {
-	tcp := protocol.MatchServer{}
+	tcp := tcp.MatchServer{}
 	cli := cliServer{}
 
 	ft := flaggy.NewSubcommand("tcp")
@@ -34,5 +34,5 @@ func main() {
 		return
 	}
 
-	tcp.run()
+	tcp.Run()
 }
