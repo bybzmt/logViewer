@@ -37,6 +37,7 @@ func (u *Ui) Init() {
 	u.handler.Handle("/api/viewLog/edit", u.cross(u.apiViewLogEdit))
 	u.handler.Handle("/api/viewLog/del", u.cross(u.apiViewLogDel))
 	u.handler.Handle("/api/logs", u.cross(u.apiLogs))
+	u.handler.Handle("/api/glob", u.cross(u.apiGlob))
 
 	u.HttpServer.Handler = &u.handler
 
@@ -216,14 +217,25 @@ var upgrader = websocket.Upgrader{
 }
 
 func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
 
-	//sStart := r.Form.Get("start")
-	//sEnd := r.Form.Get("end")
-	slimit := r.Form.Get("limit")
+	_, input, err := conn.ReadMessage()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
-	limit, _ := strconv.Atoi(slimit)
-	if limit < 1 {
-		limit = 10
+	var m tcp.Match
+
+	err = json.Unmarshal(input, &m)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
 	addr := "127.0.0.2:7000"
@@ -235,32 +247,14 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rs.Close()
 
-	f := tcp.Match{
-		StartTime: 0,
-		Files: []tcp.File{
-			{
-				Name:       "/home/by/文档/code/bybzmt/logViewer/server/log/20220615.log",
-				TimeRegex:  `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00`,
-				TimeLayout: "2006-01-02T15:04:05Z07:00",
-			},
-		},
-		EndTime: time.Now().Unix(),
-		Limit:   uint16(limit),
-	}
+	log.Printf("match %#v\n", &m)
 
-	err = rs.Open(&f)
+	err = rs.Open(&m)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer conn.Close()
 
 	for {
 		d, err := rs.Read()
@@ -278,4 +272,31 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	time.Sleep(time.Second)
+}
+
+func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
+	pattern := r.FormValue("pattern")
+
+	rs := struct {
+		Err  string
+		Data []string
+	}{}
+	defer json.NewEncoder(w).Encode(&rs)
+
+	addr := "127.0.0.2:7000"
+	c, err := tcp.Dial(addr)
+	if err != nil {
+		rs.Err = err.Error()
+		return
+	}
+	defer c.Close()
+
+	files, err := c.Glob(pattern)
+	if err != nil {
+		rs.Err = err.Error()
+		return
+	}
+
+	rs.Data = files
+
 }

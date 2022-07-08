@@ -16,8 +16,6 @@ type File struct {
 	Regex       []string
 	ContainsNot [][]string
 	RegexNot    []string
-	LineCount   int64
-	MatchCount  int64
 }
 
 type Match struct {

@@ -71,12 +71,12 @@ func (s *MatchServer) service(ctx *matchCtx) {
 	default:
 		writeErr(ctx.rw, UnexpectedOP)
 	}
+
+	ctx.rw.Flush()
 }
 
 func (s *MatchServer) Glob(name string) ([]string, error) {
-
-	f := os.DirFS("./")
-	dirs, err := fs.Glob(f, name)
+	dirs, err := fs.Glob(os.DirFS(""), strings.TrimLeft(name, "/"))
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +84,7 @@ func (s *MatchServer) Glob(name string) ([]string, error) {
 	out := make([]string, 0, len(dirs))
 
 	for _, dir := range dirs {
+		dir = "/" + dir
 		if s.hasPrefix(dir) {
 			out = append(out, dir)
 		}
@@ -187,8 +188,6 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx) {
 			writeBytes(ctx.rw, d)
 		}
 	}
-
-	ctx.rw.Flush()
 }
 
 func (s *MatchServer) Run() {
