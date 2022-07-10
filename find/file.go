@@ -132,6 +132,11 @@ func (m *File) start() error {
 
 	m.r = bufio.NewReaderSize(m.f, int(m.bufSize))
 
+	if m.tailf {
+		_, err := m.f.Seek(0, io.SeekEnd)
+		return err
+	}
+
 	min, max, err := m.timeMinMax()
 	if err != nil {
 		return err
@@ -159,10 +164,9 @@ func (m *File) start() error {
 		return err
 	}
 
-	m.f.Seek(seek, io.SeekStart)
 	m.reset()
-
-	return nil
+	_, err = m.f.Seek(seek, io.SeekStart)
+	return err
 }
 
 func (m *File) findSeek(min, max int64) (int64, error) {
@@ -174,8 +178,11 @@ func (m *File) findSeek(min, max int64) (int64, error) {
 
 	seek := min + diff
 
-	m.f.Seek(seek, io.SeekStart)
 	m.reset()
+	_, err := m.f.Seek(seek, io.SeekStart)
+	if err != nil {
+		return 0, err
+	}
 
 	l, err := m.readLine()
 	if err != nil {
@@ -198,12 +205,14 @@ func (m *File) matchByTime() (*line, error) {
 
 		m.LineCount++
 
-		if l.time > m.endTime {
-			return nil, io.EOF
-		}
+		if !m.tailf {
+			if l.time > m.endTime {
+				return nil, io.EOF
+			}
 
-		if l.time < m.startTime {
-			continue
+			if l.time < m.startTime {
+				continue
+			}
 		}
 
 		return l, nil

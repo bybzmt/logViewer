@@ -2,6 +2,8 @@ package find
 
 import (
 	"io"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 const DEFAULT_LINE_BUF = 1024 * 128
@@ -14,6 +16,8 @@ type Matcher struct {
 	MatchCount int64
 	Limit      uint16
 	BufSize    uint32
+	Tailf      bool
+	watcher    *fsnotify.Watcher
 }
 
 func (rs *Matcher) Match() ([]byte, error) {
@@ -53,10 +57,19 @@ func (rs *Matcher) Init() error {
 		rs.BufSize = DEFAULT_LINE_BUF
 	}
 
+	var err error
+	if rs.Tailf {
+		rs.watcher, err = fsnotify.NewWatcher()
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, m := range rs.All {
 		m.startTime = rs.StartTime
 		m.endTime = rs.EndTime
 		m.bufSize = rs.BufSize
+		m.tailf = rs.Tailf
 
 		err := m.start()
 		if err != nil {
@@ -72,6 +85,10 @@ func (rs *Matcher) Init() error {
 				continue
 			}
 			return err
+		}
+
+		if rs.Tailf {
+			rs.watcher.Add(m.Name)
 		}
 
 		rs.results = append(rs.results, result{
