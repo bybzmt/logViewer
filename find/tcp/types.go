@@ -48,7 +48,7 @@ func writeString(w io.Writer, data string) error {
 }
 
 func readBytes(r io.Reader) ([]byte, error) {
-	var len uint16
+	var len uint32
 
 	err := binary.Read(r, binary.BigEndian, &len)
 	if err != nil {
@@ -70,7 +70,7 @@ func readBytes(r io.Reader) ([]byte, error) {
 }
 
 func writeBytes(w io.Writer, buf []byte) error {
-	var l uint16 = uint16(len(buf))
+	var l uint32 = uint32(len(buf))
 
 	err := binary.Write(w, binary.BigEndian, l)
 	if err != nil {
@@ -86,7 +86,7 @@ func writeBytes(w io.Writer, buf []byte) error {
 }
 
 func readStrings(r io.Reader) ([]string, error) {
-	var len uint16
+	var len uint32
 
 	err := binary.Read(r, binary.BigEndian, &len)
 	if err != nil {
@@ -109,7 +109,7 @@ func readStrings(r io.Reader) ([]string, error) {
 }
 
 func writeStrings(w io.Writer, strs []string) error {
-	var l uint16 = uint16(len(strs))
+	var l uint32 = uint32(len(strs))
 
 	err := binary.Write(w, binary.BigEndian, l)
 	if err != nil {

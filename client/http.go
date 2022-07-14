@@ -247,7 +247,7 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rs.Close()
 
-	log.Printf("match %#v\n", &m)
+	//log.Printf("match %#v\n", &m)
 
 	err = rs.Open(&m)
 	if err != nil {
@@ -257,17 +257,28 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
+		conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
+
 		d, err := rs.Read()
+		log.Println(string(d))
 		if err != nil {
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
-				log.Println(err)
+				log.Println(2, err)
 			}
 			break
 		}
 
-		if err := conn.WriteMessage(websocket.TextMessage, d); err != nil {
-			log.Println(err)
+		if err := conn.WriteMessage(websocket.BinaryMessage, d); err != nil {
+			log.Println(3, err)
 			break
+		}
+
+		time.Sleep(time.Millisecond * 5)
+
+		_, _, err = conn.ReadMessage()
+		if err != nil {
+			log.Println("ReadMessage", err)
+			return
 		}
 	}
 

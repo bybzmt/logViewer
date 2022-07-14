@@ -3,7 +3,9 @@ package tcp
 import (
 	"bufio"
 	"io"
+	"log"
 	"net"
+	"time"
 )
 
 type Client struct {
@@ -63,6 +65,8 @@ func (rs *Client) Close() {
 }
 
 func (rs *Client) Read() ([]byte, error) {
+	rs.c.SetReadDeadline(time.Now().Add(time.Second * 3))
+
 	op, err := readOP(rs.rw)
 	if err != nil {
 		return nil, err
@@ -70,6 +74,11 @@ func (rs *Client) Read() ([]byte, error) {
 
 	switch op {
 	case OP_EXIT:
+		err = writeOP(rs.rw, OP_EXIT)
+		if err != nil {
+			log.Println("exit op write", err)
+		}
+
 		return nil, io.EOF
 	case OP_ERR:
 		return nil, readErr(rs.rw)

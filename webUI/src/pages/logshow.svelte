@@ -3,66 +3,72 @@
     import { getContext, onMount, onDestroy } from "svelte";
 
     let axios = getContext("axios");
-    let rows = [];
+    let logs = [];
     let selected = {};
 
     let ws;
     let msgs = [];
+    let msgMax = 200;
 
     let starttime = "";
     let endtime = "";
     let contains = "";
     let limit = "";
 
-    let match = {
-        Files: [],
-        StartTime: 0,
-        EndTime: 0,
-        Limit: 0,
-        BufSize: 1024 * 16,
-    };
-
     function viewLogs() {
         axios({ url: "/api/viewLogs" }).then((resp) => {
-            rows = resp.data;
+            logs = resp.data;
         });
     }
 
-    function search() {
+    async function search() {
+        let match = {
+            Files: [],
+            StartTime: 0,
+            EndTime: 0,
+            Limit: 0,
+            BufSize: 1024 * 512,
+        };
+
+        for (let i = 0; i < logs.length; i++) {
+            if (logs[i].selected) {
+                let data = await listFiles(logs[i]);
+                data.forEach((file) => {
+                    match.Files.push({
+                        Name: file,
+                        TimeRegex: logs[i].TimeRegex,
+                        TimeLayout: logs[i].TimeLayout,
+                        Contains: [[contains]],
+                    });
+                });
+            }
+        }
+
+        if (match.Files.length < 1) {
+            alert("没有匹配的日志");
+            return;
+        }
+
+        match.Starttime = Date.parse(starttime) / 1000;
+        match.EndTime = Date.parse(endtime) / 1000;
+        match.Limit = parseInt(limit);
+
+        if (isNaN(match.Starttime)) {
+            match.Starttime = 0;
+        }
+        if (isNaN(match.EndTime)) {
+            match.EndTime = parseInt(new Date().getTime() / 1000);
+        }
+        if (isNaN(match.Limit)) {
+            match.Limit = 0;
+        }
+
+        console.log(match);
+
         msgs = [];
 
         ws = new WebSocket("ws://" + API_BASE + "/api/logs");
         ws.onopen = () => {
-            match.Files = [];
-            rows.forEach((row) => {
-                if (row.allfile) {
-                    row.allfile.forEach((file) => {
-                        match.Files.push({
-                            Name: file,
-                            TimeRegex: row.TimeRegex,
-                            TimeLayout: row.TimeLayout,
-                            Contains: [[contains]],
-                        });
-                    });
-                }
-            });
-
-            match.Starttime = Date.parse(starttime) / 1000;
-            match.EndTime = Date.parse(endtime) / 1000;
-            match.Limit = parseInt(limit);
-
-            if (isNaN(match.Starttime)) {
-                match.Starttime = 0;
-            }
-            if (isNaN(match.EndTime)) {
-                match.EndTime = parseInt(new Date().getTime() / 1000);
-            }
-            if (isNaN(match.Limit)) {
-                match.Limit = 0;
-            }
-
-            console.log(match);
-
             ws.send(JSON.stringify(match));
         };
 
@@ -73,41 +79,58 @@
         ws.onerror = () => {
             console.log("error");
         };
-        ws.onmessage = (evt) => {
-            msgs.push(evt.data);
-            if (msgs.length > 1000) {
-                msgs = msgs.slice(-1000);
+        ws.onmessage = async (evt) => {
+            if (evt.data instanceof Blob) {
+                msgs.push(await evt.data.text());
+            } else {
+                msgs.push(evt.data);
+            }
+
+            if (msgs.length > msgMax) {
+                msgs = msgs.slice(-msgMax);
             } else {
                 msgs = msgs;
             }
+
+            ws.send("next");
         };
     }
+
     function cancel() {
         ws.close();
     }
 
-    function listFiles(log) {
-        return () => {
-            if (!log.allfile) {
-                log.allfile = [];
-            }
+    async function listFiles(log) {
+        let files = log.Files.split(/\r\n|\r|\n/);
+        let all = [];
 
-            let files = log.Files.split(/\r\n|\r|\n/);
-            files.forEach((str) => {
-                str = str.trim();
-                if (str == "") {
-                    return;
-                }
-
-                axios({ url: "/api/glob", params: { pattern: str } }).then((resp) => {
+        for (let i = 0; i < files.length; i++) {
+            let str = files[i].trim();
+            if (str != "") {
+                let data = await axios({ url: "/api/glob", params: { pattern: str } }).then((resp) => {
                     if (resp.data.Err == "") {
-                        log.allfile = log.allfile.concat(resp.data.Data);
-                        //console.log(log.allfile);
-                        rows = rows;
+                        return resp.data.Data;
+                    } else {
+                        console.log(resp.data.Err);
                     }
                 });
-            });
-        };
+
+                if (data) {
+                    all = all.concat(data);
+                }
+            }
+        }
+
+        return all;
+    }
+
+    function logSelect(log) {
+        if (log.selected) {
+            log.selected = false;
+        } else {
+            log.selected = true;
+        }
+        logs = logs;
     }
 
     onMount(() => {
@@ -118,18 +141,11 @@
 <Layout>
     <div class="flex">
         <div class="border w-1/5">
-            {#each rows as log}
+            {#each logs as log}
                 <div>
-                    <span on:click={listFiles(log)}>
+                    <span on:click={logSelect(log)} class={log.selected ? "text-red-500" : ""}>
                         {log.Note ? log.Note : log.ID}
                     </span>
-                    <ul>
-                        {#if log.allfile}
-                            {#each log.allfile as file}
-                                <li>{file}</li>
-                            {/each}
-                        {/if}
-                    </ul>
                 </div>
             {/each}
         </div>
@@ -151,7 +167,7 @@
             </div>
             <div class="border">
                 {#each msgs as msg}
-                    <p>{msg}</p>
+                    <p class="border-2">{msg}</p>
                 {/each}
             </div>
         </div>

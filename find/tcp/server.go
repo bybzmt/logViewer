@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"bufio"
 	"logViewer/find"
@@ -57,6 +58,9 @@ func (s *MatchServer) Service(c net.Conn) {
 }
 
 func (s *MatchServer) service(ctx *matchCtx) {
+	ctx.c.SetReadDeadline(time.Now().Add(time.Second * 3))
+	ctx.c.SetWriteDeadline(time.Now().Add(time.Second * 3))
+
 	op, err := readOP(ctx.rw)
 	if err != nil {
 		log.Println(err)
@@ -158,6 +162,8 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx) {
 		return
 	}
 
+	//log.Printf("match %#v\n", m)
+
 	f, err := s.newMatch(m)
 	if err != nil {
 		log.Println("newMatch", err)
@@ -168,12 +174,16 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx) {
 
 	err = f.Init()
 	if err != nil {
+		writeErr(ctx.rw, err)
 		log.Println("init", err)
 		return
 	}
 
 	for {
 		d, err := f.Match()
+		log.Println(string(d))
+
+		ctx.c.SetWriteDeadline(time.Now().Add(time.Second * 60))
 
 		if err != nil {
 			if err == io.EOF {
@@ -184,9 +194,26 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx) {
 			}
 			break
 		} else {
-			writeOP(ctx.rw, OP_MSG)
-			writeBytes(ctx.rw, d)
+			err := writeOP(ctx.rw, OP_MSG)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			err = writeBytes(ctx.rw, d)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		}
+	}
+
+	ctx.c.SetReadDeadline(time.Now().Add(time.Second * 60))
+
+	op, err := readOP(ctx.rw)
+	if err != nil {
+		log.Println("exit op error", err)
+	} else if op != OP_EXIT {
+		log.Println("exit op error", op)
 	}
 }
 
