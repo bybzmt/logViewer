@@ -58,27 +58,21 @@ func (s *MatchServer) Service(c net.Conn) {
 }
 
 func (s *MatchServer) service(ctx *matchCtx) {
-	ctx.c.SetReadDeadline(time.Now().Add(time.Second * 3))
-	ctx.c.SetWriteDeadline(time.Now().Add(time.Second * 3))
+	ctx.c.SetDeadline(time.Now().Add(time.Second * 5))
 
-	op, err := readOP(ctx.rw)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	op, buf := read(ctx.rw)
 
 	switch op {
 	case OP_GLOB:
-		s.serviceGlob(ctx)
+		s.serviceGlob(ctx, buf)
 	case OP_GREP:
-		s.serviceGrep(ctx)
+		s.serviceGrep(ctx, buf)
 	default:
-		writeErr(ctx.rw, UnexpectedOP)
+		panic(UnexpectedOP)
 	}
 
-	err = ctx.rw.Flush()
-	if err != nil {
-		log.Println("flush", err)
+	if err := ctx.rw.Flush(); err != nil {
+		panic(ErrorIO(err))
 	}
 }
 
@@ -143,94 +137,63 @@ func (s *MatchServer) hasPrefix(name string) bool {
 	return false
 }
 
-func (s *MatchServer) serviceGlob(ctx *matchCtx) {
-	file, err := readString(ctx.rw)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func (s *MatchServer) serviceGlob(ctx *matchCtx, buf []byte) {
+	dirs, err := s.Glob(string(buf))
 
-	dirs, err := s.Glob(file)
-	err = respListDir(ctx.rw, dirs, err)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	writeJson(ctx.rw, OP_GLOB, dirs, err)
 }
 
-func (s *MatchServer) serviceGrep(ctx *matchCtx) {
-	m, err := readGrep(ctx.rw)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func (s *MatchServer) serviceGrep(ctx *matchCtx, buf []byte) {
+	var m Match
+	toJson(buf, &m)
 
 	//log.Printf("match %#v\n", m)
 
-	f, err := s.newMatch(m)
+	f, err := s.newMatch(&m)
 	if err != nil {
-		log.Println("newMatch", err)
-		writeErr(ctx.rw, err)
+		write(ctx.rw, OP_ERR, []byte(err.Error()))
 		return
 	}
 	defer f.Close()
 
 	err = f.Init()
 	if err != nil {
-		writeErr(ctx.rw, err)
-		log.Println("init", err)
+		write(ctx.rw, OP_ERR, []byte(err.Error()))
 		return
 	}
 
 	for {
-		d, err := f.Match()
-		log.Println(string(d))
+		ctx.c.SetDeadline(time.Now().Add(time.Second * 5))
 
-		ctx.c.SetWriteDeadline(time.Now().Add(time.Second * 60))
-		ctx.c.SetReadDeadline(time.Now().Add(time.Second * 60))
+		op, _ := read(ctx.rw)
 
-		if err != nil {
-			if err == io.EOF {
-				err := writeOP(ctx.rw, OP_EXIT)
-				if err != nil {
-					log.Println(err)
+		switch op {
+		case OP_NEXT:
+			d, err := f.Match()
+			log.Println(string(d))
+
+			if err != nil {
+				if err == io.EOF {
+					write(ctx.rw, OP_EXIT, nil)
+				} else {
+					write(ctx.rw, OP_ERR, []byte(err.Error()))
 				}
-			} else {
-				log.Println(err)
-				err := writeErr(ctx.rw, err)
-				if err != nil {
-					log.Println(err)
-				}
+				return
 			}
-			return
-		}
 
-		err = writeOP(ctx.rw, OP_MSG)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		err = writeBytes(ctx.rw, d)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		ctx.rw.Flush()
+			write(ctx.rw, OP_MSG, d)
 
-		op, err := readOP(ctx.rw)
-		if err != nil {
-			log.Println("exit op error", err)
+			if err := ctx.rw.Flush(); err != nil {
+				panic(ErrorIO(err))
+			}
+
+		case OP_EXIT:
 			return
+		case OP_STAT:
+			return
+		default:
+			panic(UnexpectedOP)
 		}
-
-		if op == OP_OK {
-			continue
-		}
-
-		if op != OP_EXIT {
-			log.Println("error op", op)
-		}
-		return
 	}
 
 }

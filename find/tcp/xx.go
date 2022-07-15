@@ -38,6 +38,7 @@ const (
 	OP_GLOB
 	//查找文件
 	OP_GREP
+	OP_NEXT
 	//状态报告
 	OP_STAT
 )
@@ -124,69 +125,37 @@ func write(w io.Writer, op OP, data []byte) {
 	}
 }
 
-func respListDir(w io.Writer, files []string, err error) error {
+func writeJson(w io.Writer, op OP, v interface{}, err error) {
 	if err != nil {
-		err = writeOP(w, OP_ERR)
-		if err != nil {
-			return err
-		}
-		return nil
+		write(w, OP_ERR, []byte(err.Error()))
+		return
 	}
 
-	err = writeOP(w, OP_OK)
-	if err != nil {
-		return err
+	var buf bytes.Buffer
+
+	if err := json.NewEncoder(&buf).Encode(v); err != nil {
+		panic(err)
 	}
 
-	en := json.NewEncoder(w)
-	return en.Encode(files)
+	write(w, OP_GLOB, buf.Bytes())
 }
 
-func readRespListDir(r io.Reader) ([]string, error) {
-	op, err := readOP(r)
-	if err != nil {
-		return nil, err
+func toJson(buf []byte, v interface{}) {
+	if err := json.NewDecoder(bytes.NewBuffer(buf)).Decode(v); err != nil {
+		panic(err)
 	}
-
-	if op == OP_ERR {
-		str, err := readString(r)
-		if err != nil {
-			return nil, err
-		}
-
-		return nil, errors.New(str)
-	}
-
-	if op == OP_OK {
-		files := []string{}
-
-		de := json.NewDecoder(r)
-		err := de.Decode(&files)
-		if err != nil {
-			return nil, err
-		}
-		return files, nil
-	}
-
-	return nil, UnexpectedOP
 }
 
-func readGrep(r io.Reader) (*Match, error) {
-	var m Match
-	de := json.NewDecoder(r)
-	err := de.Decode(&m)
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
-}
+func readJson(r io.Reader, op OP, v interface{}) error {
+	op2, buf := read(r)
 
-func writeGrep(w io.Writer, m *Match) error {
-	err := writeOP(w, OP_GREP)
-	if err != nil {
-		return err
+	if op2 == OP_ERR {
+		return errors.New(string(buf))
 	}
 
-	en := json.NewEncoder(w)
-	return en.Encode(m)
+	if op == op2 {
+		toJson(buf, v)
+	}
+
+	panic(UnexpectedOP)
 }

@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"log"
 	"net"
@@ -29,68 +30,72 @@ func Dial(addr string) (*Client, error) {
 }
 
 func (rs *Client) Glob(pattern string) ([]string, error) {
-	err := writeOP(rs.rw, OP_GLOB)
-	if err != nil {
-		return nil, err
+
+	write(rs.rw, OP_GLOB, []byte(pattern))
+
+	if err := rs.rw.Flush(); err != nil {
+		panic(ErrorIO(err))
 	}
-	err = writeString(rs.rw, pattern)
-	if err != nil {
+
+	files := []string{}
+
+	if err := readJson(rs.rw, OP_GLOB, &files); err != nil {
 		return nil, err
 	}
 
-	err = rs.rw.Flush()
-	if err != nil {
-		return nil, err
-	}
-
-	return readRespListDir(rs.rw)
+	return files, nil
 }
 
 func (rs *Client) Open(m *Match) error {
-	err := writeGrep(rs.rw, m)
-	if err != nil {
-		return err
-	}
+	writeJson(rs.rw, OP_GREP, m, nil)
 
-	err = rs.rw.Flush()
-	if err != nil {
-		return err
+	if err := rs.rw.Flush(); err != nil {
+		panic(ErrorIO(err))
 	}
 
 	return nil
 }
 
 func (rs *Client) Close() {
+	write(rs.rw, OP_EXIT, nil)
+
+	if err := rs.rw.Flush(); err != nil {
+		log.Println("close", err)
+	}
+
 	rs.c.Close()
 }
 
 func (rs *Client) Read() ([]byte, error) {
-	rs.c.SetReadDeadline(time.Now().Add(time.Second * 5))
-	rs.c.SetWriteDeadline(time.Now().Add(time.Second * 5))
+	rs.c.SetDeadline(time.Now().Add(time.Second * 5))
 
-	op, err := readOP(rs.rw)
-	if err != nil {
-		return nil, err
+	write(rs.rw, OP_NEXT, nil)
+	if err := rs.rw.Flush(); err != nil {
+		panic(ErrorIO(err))
 	}
+
+	op, buf := read(rs.rw)
+
+	defer func() {
+		if err := rs.rw.Flush(); err != nil {
+			panic(ErrorIO(err))
+		}
+	}()
 
 	switch op {
 	case OP_EXIT:
-		err = writeOP(rs.rw, OP_EXIT)
-		if err != nil {
-			log.Println("exit op write", err)
-		}
+		write(rs.rw, OP_EXIT, nil)
 
 		return nil, io.EOF
 	case OP_ERR:
-		return nil, readErr(rs.rw)
+		write(rs.rw, OP_EXIT, nil)
+
+		return nil, errors.New(string(buf))
 	case OP_MSG:
-		t, err := readBytes(rs.rw)
-		if err == nil {
-			writeOP(rs.rw, OP_OK)
-			rs.rw.Flush()
-		}
-		return t, err
+		write(rs.rw, OP_EXIT, nil)
+
+		return buf, nil
 	default:
-		return nil, UnexpectedOP
+		panic(UnexpectedOP)
 	}
 }
