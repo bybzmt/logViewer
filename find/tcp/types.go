@@ -85,47 +85,6 @@ func writeBytes(w io.Writer, buf []byte) error {
 	return err
 }
 
-func readStrings(r io.Reader) ([]string, error) {
-	var len uint32
-
-	err := binary.Read(r, binary.BigEndian, &len)
-	if err != nil {
-		return nil, err
-	}
-
-	var out []string
-
-	for len > 0 {
-		str, err := readString(r)
-		if err != nil {
-			return nil, err
-		}
-
-		out = append(out, str)
-		len--
-	}
-
-	return out, nil
-}
-
-func writeStrings(w io.Writer, strs []string) error {
-	var l uint32 = uint32(len(strs))
-
-	err := binary.Write(w, binary.BigEndian, l)
-	if err != nil {
-		return err
-	}
-
-	for _, str := range strs {
-		err := writeString(w, str)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func readErr(r io.Reader) error {
 	str, err := readString(r)
 	if err != nil {

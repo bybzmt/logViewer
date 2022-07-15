@@ -76,7 +76,10 @@ func (s *MatchServer) service(ctx *matchCtx) {
 		writeErr(ctx.rw, UnexpectedOP)
 	}
 
-	ctx.rw.Flush()
+	err = ctx.rw.Flush()
+	if err != nil {
+		log.Println("flush", err)
+	}
 }
 
 func (s *MatchServer) Glob(name string) ([]string, error) {
@@ -184,37 +187,52 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx) {
 		log.Println(string(d))
 
 		ctx.c.SetWriteDeadline(time.Now().Add(time.Second * 60))
+		ctx.c.SetReadDeadline(time.Now().Add(time.Second * 60))
 
 		if err != nil {
 			if err == io.EOF {
-				writeOP(ctx.rw, OP_EXIT)
+				err := writeOP(ctx.rw, OP_EXIT)
+				if err != nil {
+					log.Println(err)
+				}
 			} else {
-				writeErr(ctx.rw, err)
 				log.Println(err)
+				err := writeErr(ctx.rw, err)
+				if err != nil {
+					log.Println(err)
+				}
 			}
-			break
-		} else {
-			err := writeOP(ctx.rw, OP_MSG)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			err = writeBytes(ctx.rw, d)
-			if err != nil {
-				log.Println(err)
-				return
-			}
+			return
 		}
+
+		err = writeOP(ctx.rw, OP_MSG)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		err = writeBytes(ctx.rw, d)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		ctx.rw.Flush()
+
+		op, err := readOP(ctx.rw)
+		if err != nil {
+			log.Println("exit op error", err)
+			return
+		}
+
+		if op == OP_OK {
+			continue
+		}
+
+		if op != OP_EXIT {
+			log.Println("error op", op)
+		}
+		return
 	}
 
-	ctx.c.SetReadDeadline(time.Now().Add(time.Second * 60))
-
-	op, err := readOP(ctx.rw)
-	if err != nil {
-		log.Println("exit op error", err)
-	} else if op != OP_EXIT {
-		log.Println("exit op error", op)
-	}
 }
 
 func (s *MatchServer) Run() {

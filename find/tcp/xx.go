@@ -1,12 +1,15 @@
 package tcp
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
 )
 
-type OP uint16
+type OP uint8
 
 type File struct {
 	Name        string
@@ -35,11 +38,91 @@ const (
 	OP_GLOB
 	//查找文件
 	OP_GREP
-	//启动操作
-	OP_START
 	//状态报告
 	OP_STAT
 )
+
+func read(r io.Reader) (OP, []byte) {
+	var data uint32
+
+	err := binary.Read(r, binary.BigEndian, &data)
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+
+	op := OP(data >> 24)
+	len := data & 0x0fff
+
+	if len == 0 {
+		return op, nil
+	}
+
+	var buf bytes.Buffer
+
+	_, err = io.CopyN(&buf, r, int64(len))
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+
+	if op == OP_MSG {
+		zr, err := gzip.NewReader(&buf)
+		if err != nil {
+			panic(err)
+		}
+
+		var buf2 bytes.Buffer
+
+		if _, err := io.Copy(&buf2, zr); err != nil {
+			panic(err)
+		}
+
+		if err := zr.Close(); err != nil {
+			panic(err)
+		}
+
+		return op, buf2.Bytes()
+	}
+
+	return op, buf.Bytes()
+}
+
+func write(w io.Writer, op OP, data []byte) {
+	l := uint32(len(data))
+
+	if l > 0 {
+		if op == OP_MSG {
+			var buf bytes.Buffer
+			zw := gzip.NewWriter(&buf)
+
+			if _, err := zw.Write(data); err != nil {
+				panic(err)
+			}
+
+			if err := zw.Close(); err != nil {
+				panic(err)
+			}
+
+			l = uint32(buf.Len())
+			data = buf.Bytes()
+		}
+	}
+
+	code := (uint32(op) << 24) | l
+
+	err := binary.Write(w, binary.BigEndian, &code)
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+
+	if l == 0 {
+		return
+	}
+
+	_, err = w.Write(data)
+	if err != nil {
+		panic(ErrorIO(err))
+	}
+}
 
 func respListDir(w io.Writer, files []string, err error) error {
 	if err != nil {
@@ -55,7 +138,8 @@ func respListDir(w io.Writer, files []string, err error) error {
 		return err
 	}
 
-	return writeStrings(w, files)
+	en := json.NewEncoder(w)
+	return en.Encode(files)
 }
 
 func readRespListDir(r io.Reader) ([]string, error) {
@@ -74,7 +158,14 @@ func readRespListDir(r io.Reader) ([]string, error) {
 	}
 
 	if op == OP_OK {
-		return readStrings(r)
+		files := []string{}
+
+		de := json.NewDecoder(r)
+		err := de.Decode(&files)
+		if err != nil {
+			return nil, err
+		}
+		return files, nil
 	}
 
 	return nil, UnexpectedOP

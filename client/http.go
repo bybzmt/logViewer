@@ -257,10 +257,11 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
-		conn.SetWriteDeadline(time.Now().Add(time.Second * 3))
+		conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
+		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 
 		d, err := rs.Read()
-		log.Println(string(d))
+		log.Println(string(d), err)
 		if err != nil {
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
 				log.Println(2, err)
@@ -272,8 +273,6 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 			log.Println(3, err)
 			break
 		}
-
-		time.Sleep(time.Millisecond * 5)
 
 		_, _, err = conn.ReadMessage()
 		if err != nil {
