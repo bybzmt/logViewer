@@ -4,15 +4,15 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"time"
 )
 
 type Client struct {
-	Addr string
-	c    Conn
-	rw   *bufio.ReadWriter
+	Addr    string
+	c       Conn
+	rw      *bufio.ReadWriter
+	Timeout time.Duration
 }
 
 func Dial(addr string) (*Client, error) {
@@ -35,6 +35,8 @@ func NewClient(c Conn) (*Client, error) {
 func (c *Client) Glob(pattern string) (out []string, err error) {
 	defer tryErr(&err)
 
+	c.c.SetDeadline(time.Now().Add(c.Timeout))
+
 	write(c.rw, OP_GLOB, []byte(pattern))
 
 	if e := c.rw.Flush(); e != nil {
@@ -51,6 +53,8 @@ func (c *Client) Glob(pattern string) (out []string, err error) {
 func (c *Client) Open(m *Match) (err error) {
 	defer tryErr(&err)
 
+	c.c.SetDeadline(time.Now().Add(c.Timeout))
+
 	writeJson(c.rw, OP_GREP, m, nil)
 
 	if e := c.rw.Flush(); e != nil {
@@ -60,33 +64,12 @@ func (c *Client) Open(m *Match) (err error) {
 	return
 }
 
-func (c *Client) Close() {
-	write(c.rw, OP_EXIT, nil)
-
-	if e := c.rw.Flush(); e != nil {
-		log.Println("close", e)
-	}
-
-	c.c.Close()
-}
-
-func tryErr(err *error) {
-	switch p := recover(); e := p.(type) {
-	case ErrorIO:
-		*err = e
-	case ErrorProtocol:
-		*err = e
-	default:
-		panic(p)
-	}
-}
-
 func (c *Client) Read() (data []byte, err error) {
-	c.c.SetDeadline(time.Now().Add(time.Second * 5))
-
 	defer tryErr(&err)
 
-	write(c.rw, OP_NEXT, nil)
+	c.c.SetDeadline(time.Now().Add(c.Timeout))
+
+	write(c.rw, OP_READ, nil)
 
 	if e := c.rw.Flush(); e != nil {
 		panic(ErrorIO(e))
@@ -114,6 +97,22 @@ func (c *Client) Read() (data []byte, err error) {
 	if e := c.rw.Flush(); e != nil {
 		panic(ErrorIO(e))
 	}
+
+	return
+}
+
+func (c *Client) Close() (err error) {
+	defer tryErr(&err)
+
+	c.c.SetDeadline(time.Now().Add(c.Timeout))
+
+	write(c.rw, OP_EXIT, nil)
+
+	if e := c.rw.Flush(); e != nil {
+		panic(ErrorIO(e))
+	}
+
+	c.c.Close()
 
 	return
 }

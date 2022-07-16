@@ -8,14 +8,14 @@ import (
 
 type ErrorIO error
 type ErrorProtocol error
-type ErrorAccessDenied error
+type ErrorUser error
 
 func unexpectedOP(op OP) ErrorProtocol {
 	return ErrorProtocol(fmt.Errorf("unexpected op:%d", op))
 }
 
-var AccessDenied = ErrorAccessDenied(errors.New("access denied"))
-var NotOpenFile = ErrorAccessDenied(errors.New("not open file"))
+var AccessDenied = ErrorUser(errors.New("access denied"))
+var NotOpenFile = ErrorUser(errors.New("not open file"))
 
 type File struct {
 	Name        string
@@ -35,9 +35,25 @@ type Match struct {
 	BufSize   uint32
 }
 
+type Stat struct {
+	Seek int64
+	All  int64
+}
+
 type Conn interface {
 	Read(b []byte) (n int, err error)
 	Write(b []byte) (n int, err error)
 	Close() error
 	SetDeadline(t time.Time) error
+}
+
+func tryErr(err *error) {
+	switch p := recover(); e := p.(type) {
+	case ErrorIO:
+		*err = e
+	case ErrorProtocol:
+		*err = e
+	default:
+		panic(p)
+	}
 }

@@ -100,6 +100,33 @@ func (rs *Matcher) Init() error {
 	return nil
 }
 
+func (rs *Matcher) Stat() (seek int64, all int64, err error) {
+	for _, m := range rs.All {
+		var old int64 = 0
+		var end int64 = 0
+
+		old, err = m.f.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return
+		}
+
+		end, err = m.f.Seek(0, io.SeekEnd)
+		if err != nil {
+			return
+		}
+
+		_, err = m.f.Seek(old, io.SeekStart)
+		if err != nil {
+			return
+		}
+
+		seek += old
+		all += end
+	}
+
+	return
+}
+
 func (rs *Matcher) Close() {
 	for _, m := range rs.All {
 		m.f.Close()

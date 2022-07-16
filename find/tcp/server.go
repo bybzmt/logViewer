@@ -28,8 +28,9 @@ func (ctx *matchCtx) close() {
 }
 
 type MatchServer struct {
-	Addr string
-	Dirs []string
+	Addr    string
+	Dirs    []string
+	Timeout time.Duration
 }
 
 func (s *MatchServer) Service(c Conn) {
@@ -39,6 +40,10 @@ func (s *MatchServer) Service(c Conn) {
 			log.Println(err)
 		}
 	}()
+
+	if s.Timeout < 1 {
+		s.Timeout = time.Second * 5
+	}
 
 	r := bufio.NewReader(c)
 	w := bufio.NewWriter(c)
@@ -54,7 +59,7 @@ func (s *MatchServer) Service(c Conn) {
 
 func (s *MatchServer) service(ctx *matchCtx) {
 	for {
-		ctx.c.SetDeadline(time.Now().Add(time.Second * 5))
+		ctx.c.SetDeadline(time.Now().Add(s.Timeout))
 
 		op, buf := read(ctx.rw)
 
@@ -63,8 +68,10 @@ func (s *MatchServer) service(ctx *matchCtx) {
 			s.serviceGlob(ctx, buf)
 		case OP_GREP:
 			s.serviceGrep(ctx, buf)
-		case OP_NEXT:
-			s.serviceNext(ctx, buf)
+		case OP_READ:
+			s.serviceRead(ctx, buf)
+		case OP_STAT:
+			s.serviceStat(ctx, buf)
 		case OP_EXIT:
 			return
 		default:
@@ -167,7 +174,7 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx, buf []byte) {
 	ctx.matcher = f
 }
 
-func (s *MatchServer) serviceNext(ctx *matchCtx, buf []byte) {
+func (s *MatchServer) serviceRead(ctx *matchCtx, buf []byte) {
 
 	if ctx.matcher == nil {
 		write(ctx.rw, OP_ERR, []byte(NotOpenFile.Error()))
@@ -187,6 +194,23 @@ func (s *MatchServer) serviceNext(ctx *matchCtx, buf []byte) {
 	}
 
 	write(ctx.rw, OP_MSG, d)
+}
+
+func (s *MatchServer) serviceStat(ctx *matchCtx, buf []byte) {
+
+	if ctx.matcher == nil {
+		write(ctx.rw, OP_ERR, []byte(NotOpenFile.Error()))
+		return
+	}
+
+	seek, all, err := ctx.matcher.Stat()
+
+	o := Stat{
+		Seek: seek,
+		All:  all,
+	}
+
+	writeJson(ctx.rw, OP_STAT, o, err)
 }
 
 func (s *MatchServer) Run() {

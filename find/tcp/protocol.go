@@ -21,7 +21,7 @@ const (
 	OP_GLOB
 	//查找文件
 	OP_GREP
-	OP_NEXT
+	OP_READ
 	//状态报告
 	OP_STAT
 	OP_GZIP = 1 << 7
