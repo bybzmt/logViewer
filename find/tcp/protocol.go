@@ -11,6 +11,8 @@ import (
 
 type OP uint8
 
+const mask uint32 = 0x00ffffff
+
 const (
 	OP_EXIT OP = iota
 	OP_OK
@@ -36,7 +38,7 @@ func read(r io.Reader) (OP, []byte) {
 	}
 
 	op := OP(data >> 24)
-	len := data & 0x0fff
+	len := data & mask
 
 	if len == 0 {
 		return op, nil
@@ -57,12 +59,12 @@ func read(r io.Reader) (OP, []byte) {
 
 		var buf2 bytes.Buffer
 
-		if _, err := io.Copy(&buf2, zr); err != nil {
-			panic(err)
+		if _, e := io.Copy(&buf2, zr); e != nil {
+			panic(e)
 		}
 
-		if err := zr.Close(); err != nil {
-			panic(err)
+		if e := zr.Close(); e != nil {
+			panic(e)
 		}
 
 		op &^= OP_GZIP
@@ -76,16 +78,20 @@ func read(r io.Reader) (OP, []byte) {
 func write(w io.Writer, op OP, data []byte) {
 	l := uint32(len(data))
 
+	if l >= mask {
+		panic(writeDataBig)
+	}
+
 	if l > 50 {
 		var buf bytes.Buffer
 		zw := gzip.NewWriter(&buf)
 
-		if _, err := zw.Write(data); err != nil {
-			panic(err)
+		if _, e := zw.Write(data); e != nil {
+			panic(e)
 		}
 
-		if err := zw.Close(); err != nil {
-			panic(err)
+		if e := zw.Close(); e != nil {
+			panic(e)
 		}
 
 		l = uint32(buf.Len())
@@ -126,12 +132,6 @@ func writeJson(w io.Writer, op OP, v interface{}, err error) {
 	write(w, OP_GLOB, buf.Bytes())
 }
 
-func toJson(buf []byte, v interface{}) {
-	if err := json.NewDecoder(bytes.NewBuffer(buf)).Decode(v); err != nil {
-		panic(err)
-	}
-}
-
 func readJson(r io.Reader, op OP, v interface{}) error {
 	op2, buf := read(r)
 
@@ -140,7 +140,10 @@ func readJson(r io.Reader, op OP, v interface{}) error {
 	}
 
 	if op == op2 {
-		toJson(buf, v)
+		err := json.Unmarshal(buf, v)
+		if err != nil {
+			panic(ErrorProtocol(err))
+		}
 	}
 
 	panic(unexpectedOP(op))

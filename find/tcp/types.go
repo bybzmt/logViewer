@@ -14,8 +14,9 @@ func unexpectedOP(op OP) ErrorProtocol {
 	return ErrorProtocol(fmt.Errorf("unexpected op:%d", op))
 }
 
-var AccessDenied = ErrorUser(errors.New("access denied"))
-var NotOpenFile = ErrorUser(errors.New("not open file"))
+var writeDataBig = ErrorProtocol(fmt.Errorf("writedata exceed %d", mask))
+var notOpenFile = ErrorUser(errors.New("not open file"))
+var repeatOpenFile = ErrorUser(errors.New("repeat open file"))
 
 type File struct {
 	Name        string
@@ -33,11 +34,6 @@ type Match struct {
 	EndTime   int64
 	Limit     uint16
 	BufSize   uint32
-}
-
-type Stat struct {
-	Seek int64
-	All  int64
 }
 
 type Conn interface {

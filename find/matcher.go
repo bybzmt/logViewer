@@ -100,7 +100,12 @@ func (rs *Matcher) Init() error {
 	return nil
 }
 
-func (rs *Matcher) Stat() (seek int64, all int64, err error) {
+type Stat struct {
+	Seek int64
+	All  int64
+}
+
+func (rs *Matcher) Stat() (s Stat, err error) {
 	for _, m := range rs.All {
 		var old int64 = 0
 		var end int64 = 0
@@ -120,8 +125,8 @@ func (rs *Matcher) Stat() (seek int64, all int64, err error) {
 			return
 		}
 
-		seek += old
-		all += end
+		s.Seek += old
+		s.All += end
 	}
 
 	return

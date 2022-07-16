@@ -1,6 +1,8 @@
 package tcp
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
@@ -112,7 +114,7 @@ func (s *MatchServer) newMatch(m *Match) (*find.Matcher, error) {
 
 	for _, fi := range m.Files {
 		if !s.hasPrefix(fi.Name) {
-			return nil, AccessDenied
+			return nil, ErrorUser(fmt.Errorf("access denied file:%s", fi.Name))
 		}
 
 		reg, err := find.PerlRegexp(fi.TimeRegex)
@@ -152,8 +154,17 @@ func (s *MatchServer) serviceGlob(ctx *matchCtx, buf []byte) {
 }
 
 func (s *MatchServer) serviceGrep(ctx *matchCtx, buf []byte) {
+
+	if ctx.matcher != nil {
+		write(ctx.rw, OP_ERR, []byte(repeatOpenFile.Error()))
+		return
+	}
+
 	var m Match
-	toJson(buf, &m)
+	err := json.Unmarshal(buf, &m)
+	if err != nil {
+		panic(ErrorProtocol(err))
+	}
 
 	//log.Printf("match %#v\n", m)
 
@@ -177,7 +188,7 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx, buf []byte) {
 func (s *MatchServer) serviceRead(ctx *matchCtx, buf []byte) {
 
 	if ctx.matcher == nil {
-		write(ctx.rw, OP_ERR, []byte(NotOpenFile.Error()))
+		write(ctx.rw, OP_ERR, []byte(notOpenFile.Error()))
 		return
 	}
 
@@ -199,18 +210,13 @@ func (s *MatchServer) serviceRead(ctx *matchCtx, buf []byte) {
 func (s *MatchServer) serviceStat(ctx *matchCtx, buf []byte) {
 
 	if ctx.matcher == nil {
-		write(ctx.rw, OP_ERR, []byte(NotOpenFile.Error()))
+		write(ctx.rw, OP_ERR, []byte(notOpenFile.Error()))
 		return
 	}
 
-	seek, all, err := ctx.matcher.Stat()
+	out, err := ctx.matcher.Stat()
 
-	o := Stat{
-		Seek: seek,
-		All:  all,
-	}
-
-	writeJson(ctx.rw, OP_STAT, o, err)
+	writeJson(ctx.rw, OP_STAT, out, err)
 }
 
 func (s *MatchServer) Run() {
