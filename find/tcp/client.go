@@ -11,7 +11,7 @@ import (
 
 type Client struct {
 	Addr string
-	c    net.Conn
+	c    Conn
 	rw   *bufio.ReadWriter
 }
 
@@ -20,7 +20,10 @@ func Dial(addr string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewClient(c)
+}
 
+func NewClient(c Conn) (*Client, error) {
 	var rs Client
 	rs.c = c
 	w := bufio.NewWriter(c)
@@ -29,73 +32,88 @@ func Dial(addr string) (*Client, error) {
 	return &rs, nil
 }
 
-func (rs *Client) Glob(pattern string) ([]string, error) {
+func (c *Client) Glob(pattern string) (out []string, err error) {
+	defer tryErr(&err)
 
-	write(rs.rw, OP_GLOB, []byte(pattern))
+	write(c.rw, OP_GLOB, []byte(pattern))
 
-	if err := rs.rw.Flush(); err != nil {
-		panic(ErrorIO(err))
+	if e := c.rw.Flush(); e != nil {
+		panic(ErrorIO(e))
 	}
 
-	files := []string{}
-
-	if err := readJson(rs.rw, OP_GLOB, &files); err != nil {
+	if err := readJson(c.rw, OP_GLOB, &out); err != nil {
 		return nil, err
 	}
 
-	return files, nil
+	return
 }
 
-func (rs *Client) Open(m *Match) error {
-	writeJson(rs.rw, OP_GREP, m, nil)
+func (c *Client) Open(m *Match) (err error) {
+	defer tryErr(&err)
 
-	if err := rs.rw.Flush(); err != nil {
-		panic(ErrorIO(err))
+	writeJson(c.rw, OP_GREP, m, nil)
+
+	if e := c.rw.Flush(); e != nil {
+		panic(ErrorIO(e))
 	}
 
-	return nil
+	return
 }
 
-func (rs *Client) Close() {
-	write(rs.rw, OP_EXIT, nil)
+func (c *Client) Close() {
+	write(c.rw, OP_EXIT, nil)
 
-	if err := rs.rw.Flush(); err != nil {
-		log.Println("close", err)
+	if e := c.rw.Flush(); e != nil {
+		log.Println("close", e)
 	}
 
-	rs.c.Close()
+	c.c.Close()
 }
 
-func (rs *Client) Read() ([]byte, error) {
-	rs.c.SetDeadline(time.Now().Add(time.Second * 5))
+func tryErr(err *error) {
+	switch p := recover(); e := p.(type) {
+	case ErrorIO:
+		*err = e
+	case ErrorProtocol:
+		*err = e
+	default:
+		panic(p)
+	}
+}
 
-	write(rs.rw, OP_NEXT, nil)
-	if err := rs.rw.Flush(); err != nil {
-		panic(ErrorIO(err))
+func (c *Client) Read() (data []byte, err error) {
+	c.c.SetDeadline(time.Now().Add(time.Second * 5))
+
+	defer tryErr(&err)
+
+	write(c.rw, OP_NEXT, nil)
+
+	if e := c.rw.Flush(); e != nil {
+		panic(ErrorIO(e))
 	}
 
-	op, buf := read(rs.rw)
-
-	defer func() {
-		if err := rs.rw.Flush(); err != nil {
-			panic(ErrorIO(err))
-		}
-	}()
+	op, buf := read(c.rw)
 
 	switch op {
-	case OP_EXIT:
-		write(rs.rw, OP_EXIT, nil)
+	case OP_EOF:
+		write(c.rw, OP_EXIT, nil)
 
-		return nil, io.EOF
+		err = io.EOF
 	case OP_ERR:
-		write(rs.rw, OP_EXIT, nil)
+		write(c.rw, OP_EXIT, nil)
 
-		return nil, errors.New(string(buf))
+		err = errors.New(string(buf))
 	case OP_MSG:
-		write(rs.rw, OP_EXIT, nil)
+		write(c.rw, OP_EXIT, nil)
 
-		return buf, nil
+		data = buf
 	default:
-		panic(UnexpectedOP)
+		panic(unexpectedOP(op))
 	}
+
+	if e := c.rw.Flush(); e != nil {
+		panic(ErrorIO(e))
+	}
+
+	return
 }

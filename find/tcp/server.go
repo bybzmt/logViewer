@@ -13,22 +13,18 @@ import (
 	"logViewer/find"
 )
 
-type oPhandler func(ctx *matchCtx)
-
 type matchCtx struct {
-	c       net.Conn
+	c       Conn
 	rw      *bufio.ReadWriter
-	matcher find.Matcher
-	dirs    []string
-	msg     chan []byte
-	err     chan error
-	op      chan OP
-	run     bool
-	mode    uint8
+	matcher *find.Matcher
 }
 
 func (ctx *matchCtx) close() {
 	defer ctx.c.Close()
+
+	if ctx.matcher != nil {
+		ctx.matcher.Close()
+	}
 }
 
 type MatchServer struct {
@@ -36,7 +32,13 @@ type MatchServer struct {
 	Dirs []string
 }
 
-func (s *MatchServer) Service(c net.Conn) {
+func (s *MatchServer) Service(c Conn) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	r := bufio.NewReader(c)
 	w := bufio.NewWriter(c)
@@ -47,32 +49,31 @@ func (s *MatchServer) Service(c net.Conn) {
 	}
 	defer ctx.close()
 
-	defer func() {
-		err := recover()
-		if err != nil {
-			log.Println(err)
-		}
-	}()
-
 	s.service(&ctx)
 }
 
 func (s *MatchServer) service(ctx *matchCtx) {
-	ctx.c.SetDeadline(time.Now().Add(time.Second * 5))
+	for {
+		ctx.c.SetDeadline(time.Now().Add(time.Second * 5))
 
-	op, buf := read(ctx.rw)
+		op, buf := read(ctx.rw)
 
-	switch op {
-	case OP_GLOB:
-		s.serviceGlob(ctx, buf)
-	case OP_GREP:
-		s.serviceGrep(ctx, buf)
-	default:
-		panic(UnexpectedOP)
-	}
+		switch op {
+		case OP_GLOB:
+			s.serviceGlob(ctx, buf)
+		case OP_GREP:
+			s.serviceGrep(ctx, buf)
+		case OP_NEXT:
+			s.serviceNext(ctx, buf)
+		case OP_EXIT:
+			return
+		default:
+			panic(unexpectedOP(op))
+		}
 
-	if err := ctx.rw.Flush(); err != nil {
-		panic(ErrorIO(err))
+		if err := ctx.rw.Flush(); err != nil {
+			panic(ErrorIO(err))
+		}
 	}
 }
 
@@ -154,48 +155,38 @@ func (s *MatchServer) serviceGrep(ctx *matchCtx, buf []byte) {
 		write(ctx.rw, OP_ERR, []byte(err.Error()))
 		return
 	}
-	defer f.Close()
 
 	err = f.Init()
 	if err != nil {
+		f.Close()
+
 		write(ctx.rw, OP_ERR, []byte(err.Error()))
 		return
 	}
 
-	for {
-		ctx.c.SetDeadline(time.Now().Add(time.Second * 5))
+	ctx.matcher = f
+}
 
-		op, _ := read(ctx.rw)
+func (s *MatchServer) serviceNext(ctx *matchCtx, buf []byte) {
 
-		switch op {
-		case OP_NEXT:
-			d, err := f.Match()
-			log.Println(string(d))
-
-			if err != nil {
-				if err == io.EOF {
-					write(ctx.rw, OP_EXIT, nil)
-				} else {
-					write(ctx.rw, OP_ERR, []byte(err.Error()))
-				}
-				return
-			}
-
-			write(ctx.rw, OP_MSG, d)
-
-			if err := ctx.rw.Flush(); err != nil {
-				panic(ErrorIO(err))
-			}
-
-		case OP_EXIT:
-			return
-		case OP_STAT:
-			return
-		default:
-			panic(UnexpectedOP)
-		}
+	if ctx.matcher == nil {
+		write(ctx.rw, OP_ERR, []byte(NotOpenFile.Error()))
+		return
 	}
 
+	d, err := ctx.matcher.Match()
+	log.Println(string(d))
+
+	if err != nil {
+		if err == io.EOF {
+			write(ctx.rw, OP_EOF, nil)
+		} else {
+			write(ctx.rw, OP_ERR, []byte(err.Error()))
+		}
+		return
+	}
+
+	write(ctx.rw, OP_MSG, d)
 }
 
 func (s *MatchServer) Run() {

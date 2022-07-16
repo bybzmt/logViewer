@@ -11,27 +11,10 @@ import (
 
 type OP uint8
 
-type File struct {
-	Name        string
-	TimeRegex   string
-	TimeLayout  string
-	Contains    [][]string
-	Regex       []string
-	ContainsNot [][]string
-	RegexNot    []string
-}
-
-type Match struct {
-	Files     []File
-	StartTime int64
-	EndTime   int64
-	Limit     uint16
-	BufSize   uint32
-}
-
 const (
 	OP_EXIT OP = iota
 	OP_OK
+	OP_EOF
 	OP_MSG
 	OP_ERR
 	//列出文件列表
@@ -41,6 +24,7 @@ const (
 	OP_NEXT
 	//状态报告
 	OP_STAT
+	OP_GZIP = 1 << 7
 )
 
 func read(r io.Reader) (OP, []byte) {
@@ -65,7 +49,7 @@ func read(r io.Reader) (OP, []byte) {
 		panic(ErrorIO(err))
 	}
 
-	if op == OP_MSG {
+	if op&OP_GZIP != 0 {
 		zr, err := gzip.NewReader(&buf)
 		if err != nil {
 			panic(err)
@@ -81,6 +65,8 @@ func read(r io.Reader) (OP, []byte) {
 			panic(err)
 		}
 
+		op &^= OP_GZIP
+
 		return op, buf2.Bytes()
 	}
 
@@ -90,22 +76,22 @@ func read(r io.Reader) (OP, []byte) {
 func write(w io.Writer, op OP, data []byte) {
 	l := uint32(len(data))
 
-	if l > 0 {
-		if op == OP_MSG {
-			var buf bytes.Buffer
-			zw := gzip.NewWriter(&buf)
+	if l > 50 {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
 
-			if _, err := zw.Write(data); err != nil {
-				panic(err)
-			}
-
-			if err := zw.Close(); err != nil {
-				panic(err)
-			}
-
-			l = uint32(buf.Len())
-			data = buf.Bytes()
+		if _, err := zw.Write(data); err != nil {
+			panic(err)
 		}
+
+		if err := zw.Close(); err != nil {
+			panic(err)
+		}
+
+		l = uint32(buf.Len())
+		data = buf.Bytes()
+
+		op |= OP_GZIP
 	}
 
 	code := (uint32(op) << 24) | l
@@ -157,5 +143,5 @@ func readJson(r io.Reader, op OP, v interface{}) error {
 		toJson(buf, v)
 	}
 
-	panic(UnexpectedOP)
+	panic(unexpectedOP(op))
 }
