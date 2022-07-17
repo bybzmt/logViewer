@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"logViewer/find/tcp"
+	"logViewer/find"
+	"logViewer/find/cli"
 
 	"github.com/gorilla/websocket"
 	"github.com/timshannon/bolthold"
@@ -230,7 +231,7 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var m tcp.Match
+	var m find.MatchParam
 
 	err = json.Unmarshal(input, &m)
 	if err != nil {
@@ -238,8 +239,8 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addr := "127.0.0.2:7000"
-	rs, err := tcp.Dial(addr)
+	addr := "./server/server"
+	rs, err := cli.Dial(addr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -257,8 +258,9 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
-		conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
-		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+		now := time.Now().Add(time.Second * 5)
+		conn.SetWriteDeadline(now)
+		conn.SetReadDeadline(now)
 
 		d, err := rs.Read()
 		log.Println(string(d), err)
@@ -293,8 +295,8 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 	}{}
 	defer json.NewEncoder(w).Encode(&rs)
 
-	addr := "127.0.0.2:7000"
-	c, err := tcp.Dial(addr)
+	addr := "./server/server"
+	c, err := cli.Dial(addr)
 	if err != nil {
 		rs.Err = err.Error()
 		return
@@ -308,5 +310,4 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rs.Data = files
-
 }

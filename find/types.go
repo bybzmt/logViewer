@@ -1,4 +1,4 @@
-package tcp
+package find
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ var writeDataBig = ErrorProtocol(fmt.Errorf("writedata exceed %d", mask))
 var notOpenFile = ErrorUser(errors.New("not open file"))
 var repeatOpenFile = ErrorUser(errors.New("repeat open file"))
 
-type File struct {
+type FileParam struct {
 	Name        string
 	TimeRegex   string
 	TimeLayout  string
@@ -28,8 +28,8 @@ type File struct {
 	RegexNot    []string
 }
 
-type Match struct {
-	Files     []File
+type MatchParam struct {
+	Files     []FileParam
 	StartTime int64
 	EndTime   int64
 	Limit     uint16
