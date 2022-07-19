@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"io"
+	"log"
 	"logViewer/find"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -11,12 +13,15 @@ import (
 func Dial(cmd string) (*find.Client, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := exec.CommandContext(ctx, cmd)
+	c.Stderr = os.Stderr
 
+	log.Println(1)
 	w, err := c.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
 
+	log.Println(2)
 	r, err := c.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -27,10 +32,17 @@ func Dial(cmd string) (*find.Client, error) {
 		w:      w,
 		cancel: cancel,
 		cmd:    c,
+		ctx:    ctx,
 	}
 
-	c.Start()
+	err = c.Start()
+	if err != nil {
+		return nil, err
+	}
 
+	time.Sleep(time.Millisecond * 100)
+
+	log.Println(3)
 	return find.NewClient(&conn), nil
 }
 
@@ -38,6 +50,7 @@ type rw2 struct {
 	r      io.ReadCloser
 	w      io.WriteCloser
 	cancel context.CancelFunc
+	ctx    context.Context
 	timer  *time.Timer
 	cmd    *exec.Cmd
 }
@@ -58,7 +71,11 @@ func (c *rw2) Close() error {
 		c.timer.Stop()
 	}
 
-	c.cancel()
+	select {
+	case <-c.ctx.Done():
+	default:
+		c.cancel()
+	}
 
 	return nil
 }

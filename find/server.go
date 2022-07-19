@@ -37,7 +37,7 @@ func (s *Server) Init() {
 		s.Dirs = append(s.Dirs, "/")
 	}
 
-	if s.Timeout == 0 {
+	if s.Timeout < 1 {
 		s.Timeout = time.Second * 5
 	}
 }
@@ -49,10 +49,6 @@ func (s *Server) Service(c Conn) {
 			log.Println(err)
 		}
 	}()
-
-	if s.Timeout < 1 {
-		s.Timeout = time.Second * 5
-	}
 
 	r := bufio.NewReader(c)
 	w := bufio.NewWriter(c)
@@ -67,10 +63,17 @@ func (s *Server) Service(c Conn) {
 }
 
 func (s *Server) service(ctx *matchCtx) {
+
+	log.Println("run")
+	defer log.Println("end")
+
 	for {
+		log.Println(1)
+
 		ctx.c.SetDeadline(time.Now().Add(s.Timeout))
 
 		op, buf := read(ctx.rw)
+		log.Println("op", op)
 
 		switch op {
 		case OP_GLOB:
@@ -82,6 +85,7 @@ func (s *Server) service(ctx *matchCtx) {
 		case OP_STAT:
 			s.serviceStat(ctx, buf)
 		case OP_EXIT:
+			log.Println("OP_EXIT")
 			return
 		default:
 			panic(unexpectedOP(op))
@@ -170,7 +174,7 @@ func (s *Server) serviceGrep(ctx *matchCtx, buf []byte) {
 	var m MatchParam
 	err := json.Unmarshal(buf, &m)
 	if err != nil {
-		panic(ErrorProtocol(err))
+		panic(ErrorProtocol(fmt.Errorf("Unmarshal: %s", err)))
 	}
 
 	//log.Printf("match %#v\n", m)
@@ -200,7 +204,7 @@ func (s *Server) serviceRead(ctx *matchCtx, buf []byte) {
 	}
 
 	d, err := ctx.matcher.Match()
-	log.Println(string(d))
+	log.Println("Match", string(d), err)
 
 	if err != nil {
 		if err == io.EOF {

@@ -41,9 +41,7 @@ func (c *rw) Close() error {
 }
 
 func (c *rw) SetDeadline(t time.Time) error {
-	e := c.r.SetReadDeadline(t)
-	if e != nil {
-		return e
-	}
-	return c.w.SetWriteDeadline(t)
+	c.r.SetReadDeadline(t)
+	c.w.SetWriteDeadline(t)
+	return nil
 }

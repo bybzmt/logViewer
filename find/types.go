@@ -49,6 +49,7 @@ func tryErr(err *error) {
 		*err = e
 	case ErrorProtocol:
 		*err = e
+	case nil:
 	default:
 		panic(p)
 	}

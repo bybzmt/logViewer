@@ -3,6 +3,7 @@ package find
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"regexp"
 	"regexp/syntax"
 	"strings"
@@ -12,7 +13,7 @@ import (
 func PerlRegexp(reg string) (*regexp.Regexp, error) {
 	r, e := syntax.Parse(reg, syntax.Perl)
 	if e != nil {
-		return nil, e
+		return nil, fmt.Errorf("PerlRegexp: %s %s", reg, e)
 	}
 
 	return regexp.Compile(r.String())

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"logViewer/find"
-	"logViewer/find/cli"
+	"logViewer/find/tcp"
 
 	"github.com/gorilla/websocket"
 	"github.com/timshannon/bolthold"
@@ -239,8 +239,8 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addr := "./server/server"
-	rs, err := cli.Dial(addr)
+	addr := "127.0.0.2:7000"
+	rs, err := tcp.Dial(addr)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -263,7 +263,7 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 		conn.SetReadDeadline(now)
 
 		d, err := rs.Read()
-		log.Println(string(d), err)
+		log.Println("read", string(d), err)
 		if err != nil {
 			if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
 				log.Println(2, err)
@@ -295,8 +295,9 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 	}{}
 	defer json.NewEncoder(w).Encode(&rs)
 
-	addr := "./server/server"
-	c, err := cli.Dial(addr)
+	//addr := "./server/server"
+	addr := "127.0.0.2:7000"
+	c, err := tcp.Dial(addr)
 	if err != nil {
 		rs.Err = err.Error()
 		return
@@ -304,6 +305,7 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 	defer c.Close()
 
 	files, err := c.Glob(pattern)
+	log.Println(files, err)
 	if err != nil {
 		rs.Err = err.Error()
 		return

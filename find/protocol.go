@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -14,7 +15,7 @@ type OP uint8
 const mask uint32 = 0x00ffffff
 
 const (
-	OP_EXIT OP = iota
+	OP_EXIT OP = iota + 1
 	OP_OK
 	OP_EOF
 	OP_MSG
@@ -34,7 +35,7 @@ func read(r io.Reader) (OP, []byte) {
 
 	err := binary.Read(r, binary.BigEndian, &data)
 	if err != nil {
-		panic(ErrorIO(err))
+		panic(ErrorIO(fmt.Errorf("read err: %s", err)))
 	}
 
 	op := OP(data >> 24)
@@ -48,7 +49,7 @@ func read(r io.Reader) (OP, []byte) {
 
 	_, err = io.CopyN(&buf, r, int64(len))
 	if err != nil {
-		panic(ErrorIO(err))
+		panic(ErrorIO(fmt.Errorf("read err: %s", err)))
 	}
 
 	if op&OP_GZIP != 0 {
@@ -102,9 +103,9 @@ func write(w io.Writer, op OP, data []byte) {
 
 	code := (uint32(op) << 24) | l
 
-	err := binary.Write(w, binary.BigEndian, &code)
+	err := binary.Write(w, binary.BigEndian, code)
 	if err != nil {
-		panic(ErrorIO(err))
+		panic(ErrorIO(fmt.Errorf("write err: %s", err)))
 	}
 
 	if l == 0 {
@@ -113,7 +114,7 @@ func write(w io.Writer, op OP, data []byte) {
 
 	_, err = w.Write(data)
 	if err != nil {
-		panic(ErrorIO(err))
+		panic(ErrorIO(fmt.Errorf("write err: %s", err)))
 	}
 }
 
@@ -144,6 +145,7 @@ func readJson(r io.Reader, op OP, v interface{}) error {
 		if err != nil {
 			panic(ErrorProtocol(err))
 		}
+		return nil
 	}
 
 	panic(unexpectedOP(op))

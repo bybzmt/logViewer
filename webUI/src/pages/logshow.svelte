@@ -38,7 +38,7 @@
                         Name: file,
                         TimeRegex: logs[i].TimeRegex,
                         TimeLayout: logs[i].TimeLayout,
-                        Contains: [[contains]],
+                        Contains: contains ? [[contains]] : [],
                     });
                 });
             }

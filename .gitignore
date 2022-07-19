@@ -2,6 +2,7 @@
 logViewer
 *.db
 *.log
+*.zip
 
 /gui/libs
 /gui/gui

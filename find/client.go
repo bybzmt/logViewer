@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"log"
 	"time"
 )
 
@@ -19,6 +20,11 @@ func NewClient(c Conn) *Client {
 	w := bufio.NewWriter(c)
 	r := bufio.NewReader(c)
 	rs.rw = bufio.NewReadWriter(r, w)
+
+	if rs.Timeout < 1 {
+		rs.Timeout = time.Second * 5
+	}
+
 	return &rs
 }
 
@@ -99,7 +105,8 @@ func (c *Client) Close() (err error) {
 	write(c.rw, OP_EXIT, nil)
 
 	if e := c.rw.Flush(); e != nil {
-		panic(ErrorIO(e))
+		log.Println("Flush", e)
+		//panic(ErrorIO(e))
 	}
 
 	c.c.Close()
