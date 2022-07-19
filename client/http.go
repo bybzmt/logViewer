@@ -242,18 +242,20 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	addr := "127.0.0.2:7000"
 	rs, err := tcp.Dial(addr)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		log.Println(err)
 		return
 	}
-	defer rs.Close()
+
+	defer func() {
+		if e := rs.Close(); e != nil {
+			log.Println(e)
+		}
+	}()
 
 	//log.Printf("match %#v\n", &m)
 
-	err = rs.Open(&m)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+	if err = rs.Open(&m); err != nil {
+		log.Println(err)
 		return
 	}
 
@@ -302,10 +304,16 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 		rs.Err = err.Error()
 		return
 	}
-	defer c.Close()
+
+	defer func() {
+		if e := c.Close(); e != nil {
+			if rs.Err == "" {
+				rs.Err = e.Error()
+			}
+		}
+	}()
 
 	files, err := c.Glob(pattern)
-	log.Println(files, err)
 	if err != nil {
 		rs.Err = err.Error()
 		return

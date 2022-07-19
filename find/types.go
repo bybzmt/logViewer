@@ -42,15 +42,3 @@ type Conn interface {
 	Close() error
 	SetDeadline(t time.Time) error
 }
-
-func tryErr(err *error) {
-	switch p := recover(); e := p.(type) {
-	case ErrorIO:
-		*err = e
-	case ErrorProtocol:
-		*err = e
-	case nil:
-	default:
-		panic(p)
-	}
-}

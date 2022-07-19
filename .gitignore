@@ -6,20 +6,14 @@ logViewer
 
 /gui/libs
 /gui/gui
-/server/server
+cmd/cli/cli
+cmd/tcp/tcp
 
-#js
 /webUI/package-lock.json
 /webUI/node_modules
 /client/dist
 
-#vim临时文件
 *.swp
 *~
-
-#不排除占位文件
 !.empty
 
-#ctags
-tags
-ctags.sh

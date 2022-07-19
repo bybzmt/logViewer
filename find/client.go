@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"log"
 	"time"
 )
 
@@ -12,6 +11,7 @@ type Client struct {
 	c       Conn
 	rw      *bufio.ReadWriter
 	Timeout time.Duration
+	err     error
 }
 
 func NewClient(c Conn) *Client {
@@ -29,7 +29,7 @@ func NewClient(c Conn) *Client {
 }
 
 func (c *Client) Glob(pattern string) (out []string, err error) {
-	defer tryErr(&err)
+	defer c.tryErr(&err)
 
 	c.c.SetDeadline(time.Now().Add(c.Timeout))
 
@@ -47,7 +47,7 @@ func (c *Client) Glob(pattern string) (out []string, err error) {
 }
 
 func (c *Client) Open(m *MatchParam) (err error) {
-	defer tryErr(&err)
+	defer c.tryErr(&err)
 
 	c.c.SetDeadline(time.Now().Add(c.Timeout))
 
@@ -61,7 +61,7 @@ func (c *Client) Open(m *MatchParam) (err error) {
 }
 
 func (c *Client) Read() (data []byte, err error) {
-	defer tryErr(&err)
+	defer c.tryErr(&err)
 
 	c.c.SetDeadline(time.Now().Add(c.Timeout))
 
@@ -98,18 +98,34 @@ func (c *Client) Read() (data []byte, err error) {
 }
 
 func (c *Client) Close() (err error) {
-	defer tryErr(&err)
+	defer func() {
+		err = c.c.Close()
+		c.tryErr(&err)
+	}()
 
-	c.c.SetDeadline(time.Now().Add(c.Timeout))
+	if c.err == nil {
+		c.c.SetDeadline(time.Now().Add(c.Timeout))
 
-	write(c.rw, OP_EXIT, nil)
+		write(c.rw, OP_EXIT, nil)
 
-	if e := c.rw.Flush(); e != nil {
-		log.Println("Flush", e)
-		//panic(ErrorIO(e))
+		if e := c.rw.Flush(); e != nil {
+			panic(ErrorIO(e))
+		}
 	}
 
-	c.c.Close()
-
 	return
+}
+
+func (c *Client) tryErr(err *error) {
+	switch p := recover(); e := p.(type) {
+	case ErrorIO:
+		c.err = e
+		*err = e
+	case ErrorProtocol:
+		c.err = e
+		*err = e
+	case nil:
+	default:
+		panic(p)
+	}
 }
