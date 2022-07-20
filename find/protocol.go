@@ -127,10 +127,10 @@ func writeJson(w io.Writer, op OP, v interface{}, err error) {
 	var buf bytes.Buffer
 
 	if err := json.NewEncoder(&buf).Encode(v); err != nil {
-		panic(err)
+		panic(ErrorProtocol(fmt.Errorf("json encoder %s", err)))
 	}
 
-	write(w, OP_GLOB, buf.Bytes())
+	write(w, op, buf.Bytes())
 }
 
 func readJson(r io.Reader, op OP, v interface{}) error {
@@ -143,7 +143,7 @@ func readJson(r io.Reader, op OP, v interface{}) error {
 	if op == op2 {
 		err := json.Unmarshal(buf, v)
 		if err != nil {
-			panic(ErrorProtocol(err))
+			panic(ErrorProtocol(fmt.Errorf("json decoder %s", err)))
 		}
 		return nil
 	}

@@ -55,7 +55,13 @@ func (m *File) readLine() (*line, error) {
 			continue
 		}
 
-		t, ok := m.TimeParser(data)
+		var t int64
+		var ok bool = true
+
+		if m.TimeParser != nil {
+			t, ok = m.TimeParser(data)
+		}
+
 		if ok {
 			old := m.line
 

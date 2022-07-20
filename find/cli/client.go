@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"io"
-	"log"
 	"logViewer/find"
 	"os"
 	"os/exec"
@@ -15,13 +14,11 @@ func Dial(cmd string) (*find.Client, error) {
 	c := exec.CommandContext(ctx, cmd)
 	c.Stderr = os.Stderr
 
-	log.Println(1)
 	w, err := c.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println(2)
 	r, err := c.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -42,7 +39,6 @@ func Dial(cmd string) (*find.Client, error) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	log.Println(3)
 	return find.NewClient(&conn), nil
 }
 

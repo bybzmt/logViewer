@@ -69,7 +69,8 @@
 
         ws = new WebSocket("ws://" + API_BASE + "/api/logs");
         ws.onopen = () => {
-            ws.send(JSON.stringify(match));
+            ws.send(JSON.stringify({op:"grep", "data":match}));
+            ws.send(JSON.stringify({op:"read"}));
         };
 
         ws.onclose = () => {
@@ -82,8 +83,11 @@
         ws.onmessage = async (evt) => {
             if (evt.data instanceof Blob) {
                 msgs.push(await evt.data.text());
+
+                ws.send(JSON.stringify({op:"read"}));
             } else {
                 msgs.push(evt.data);
+                ws.send(JSON.stringify({op:"close"}));
             }
 
             if (msgs.length > msgMax) {
@@ -91,8 +95,6 @@
             } else {
                 msgs = msgs;
             }
-
-            ws.send("next");
         };
     }
 
@@ -149,7 +151,7 @@
                 </div>
             {/each}
         </div>
-        <div class="border w-full">
+        <div class="border w-4/5">
             <div>
                 <input class="border w-[10em]" bind:value={starttime} placeholder="开始时间" />
                 <input class="border w-[10em]" bind:value={endtime} placeholder="结束时间" />

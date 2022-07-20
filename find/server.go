@@ -63,17 +63,10 @@ func (s *Server) Service(c Conn) {
 }
 
 func (s *Server) service(ctx *matchCtx) {
-
-	log.Println("run")
-	defer log.Println("end")
-
 	for {
-		log.Println(1)
-
 		ctx.c.SetDeadline(time.Now().Add(s.Timeout))
 
 		op, buf := read(ctx.rw)
-		log.Println("op", op)
 
 		switch op {
 		case OP_GLOB:
@@ -177,8 +170,6 @@ func (s *Server) serviceGrep(ctx *matchCtx, buf []byte) {
 		panic(ErrorProtocol(fmt.Errorf("Unmarshal: %s", err)))
 	}
 
-	//log.Printf("match %#v\n", m)
-
 	f, err := s.newMatch(&m)
 	if err != nil {
 		write(ctx.rw, OP_ERR, []byte(err.Error()))
@@ -193,6 +184,8 @@ func (s *Server) serviceGrep(ctx *matchCtx, buf []byte) {
 		return
 	}
 
+	write(ctx.rw, OP_OK, nil)
+
 	ctx.matcher = f
 }
 
@@ -204,7 +197,6 @@ func (s *Server) serviceRead(ctx *matchCtx, buf []byte) {
 	}
 
 	d, err := ctx.matcher.Match()
-	log.Println("Match", string(d), err)
 
 	if err != nil {
 		if err == io.EOF {

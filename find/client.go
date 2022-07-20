@@ -57,6 +57,16 @@ func (c *Client) Open(m *MatchParam) (err error) {
 		panic(ErrorIO(e))
 	}
 
+	op, buf := read(c.rw)
+
+	switch op {
+	case OP_ERR:
+		err = errors.New(string(buf))
+	case OP_OK:
+	default:
+		panic(unexpectedOP(op))
+	}
+
 	return
 }
 
@@ -75,23 +85,13 @@ func (c *Client) Read() (data []byte, err error) {
 
 	switch op {
 	case OP_EOF:
-		write(c.rw, OP_EXIT, nil)
-
 		err = io.EOF
 	case OP_ERR:
-		write(c.rw, OP_EXIT, nil)
-
 		err = errors.New(string(buf))
 	case OP_MSG:
-		write(c.rw, OP_EXIT, nil)
-
 		data = buf
 	default:
 		panic(unexpectedOP(op))
-	}
-
-	if e := c.rw.Flush(); e != nil {
-		panic(ErrorIO(e))
 	}
 
 	return

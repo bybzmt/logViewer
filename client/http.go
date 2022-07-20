@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"logViewer/find"
-	"logViewer/find/tcp"
+	"logViewer/find/cli"
 
 	"github.com/gorilla/websocket"
 	"github.com/timshannon/bolthold"
@@ -225,22 +225,9 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	_, input, err := conn.ReadMessage()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	var m find.MatchParam
-
-	err = json.Unmarshal(input, &m)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	addr := "127.0.0.2:7000"
-	rs, err := tcp.Dial(addr)
+	//addr := "127.0.0.2:7000"
+	addr := "./cmd/cli/cli"
+	rs, err := cli.Dial(addr)
 	if err != nil {
 		log.Println(err)
 		return
@@ -252,40 +239,66 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	//log.Printf("match %#v\n", &m)
-
-	if err = rs.Open(&m); err != nil {
-		log.Println(err)
-		return
-	}
-
 	for {
 		now := time.Now().Add(time.Second * 5)
-		conn.SetWriteDeadline(now)
 		conn.SetReadDeadline(now)
+		conn.SetWriteDeadline(now)
 
-		d, err := rs.Read()
-		log.Println("read", string(d), err)
-		if err != nil {
-			if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
-				log.Println(2, err)
-			}
-			break
-		}
-
-		if err := conn.WriteMessage(websocket.BinaryMessage, d); err != nil {
-			log.Println(3, err)
-			break
-		}
-
-		_, _, err = conn.ReadMessage()
+		mtype, buf, err := conn.ReadMessage()
 		if err != nil {
 			log.Println("ReadMessage", err)
 			return
 		}
-	}
 
-	time.Sleep(time.Second)
+		var msg struct {
+			Op   string          `json:"op"`
+			Data json.RawMessage `json:"data"`
+		}
+
+		err = json.Unmarshal(buf, &msg)
+		if err != nil {
+			log.Println("josn decode", err)
+			return
+		}
+
+		if mtype == websocket.PingMessage {
+			log.Println("ping")
+		}
+
+		if mtype == websocket.TextMessage {
+			switch msg.Op {
+			case "read":
+				d, err := rs.Read()
+				if err != nil {
+					if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
+						log.Println(err)
+					}
+				} else {
+					if err := conn.WriteMessage(websocket.BinaryMessage, d); err != nil {
+						log.Println(err)
+					}
+				}
+			case "grep":
+				var m find.MatchParam
+
+				err = json.Unmarshal(msg.Data, &m)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				if err = rs.Open(&m); err != nil {
+					log.Println("open", err)
+					return
+				}
+			case "close":
+				log.Println("close")
+				return
+			default:
+				log.Println("unexpected msg", msg.Op)
+				return
+			}
+		}
+	}
 }
 
 func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
@@ -297,9 +310,9 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 	}{}
 	defer json.NewEncoder(w).Encode(&rs)
 
-	//addr := "./server/server"
-	addr := "127.0.0.2:7000"
-	c, err := tcp.Dial(addr)
+	addr := "./cmd/cli/cli"
+	//addr := "127.0.0.2:7000"
+	c, err := cli.Dial(addr)
 	if err != nil {
 		rs.Err = err.Error()
 		return
