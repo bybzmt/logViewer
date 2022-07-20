@@ -114,7 +114,7 @@ func (s *Server) newMatch(m *MatchParam) (*Matcher, error) {
 		}
 	}
 
-	return NewMatcher(m)
+	return newMatcher(m)
 }
 
 func (s *Server) hasPrefix(name string) bool {

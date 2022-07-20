@@ -131,7 +131,7 @@ func (rs *Matcher) Close() {
 	}
 }
 
-func NewMatcher(m *MatchParam) (*Matcher, error) {
+func newMatcher(m *MatchParam) (*Matcher, error) {
 	f := Matcher{
 		StartTime: m.StartTime,
 		EndTime:   m.EndTime,

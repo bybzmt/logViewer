@@ -13,7 +13,7 @@ func (s *builtin) Glob(pattern string) (out []string, err error) {
 }
 
 func (s *builtin) Open(m *MatchParam) (err error) {
-	s.f, err = NewMatcher(m)
+	s.f, err = newMatcher(m)
 	return
 }
 
