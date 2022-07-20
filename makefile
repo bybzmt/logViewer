@@ -1,12 +1,13 @@
 
-.PHONY: go js-init ui all
+.PHONY: go init ui all
 
-all: js-init go
+all: ui go
 
-go: ui
+go:
+	cd cmd/cli && go build
 	go build
 
-js-init:
+init:
 	cd ./webUI && npm i
 
 ui:

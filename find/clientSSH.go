@@ -1,14 +1,13 @@
-package ssh
+package find
 
 import (
 	"io"
-	"logViewer/find"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 )
 
-func SSHRun(sh *ssh.Client, cmd string) (*find.Client, error) {
+func NewClientSSH(sh *ssh.Client, cmd string) (Client, error) {
 	se, err := sh.NewSession()
 	if err != nil {
 		return nil, err
@@ -26,7 +25,7 @@ func SSHRun(sh *ssh.Client, cmd string) (*find.Client, error) {
 
 	se.Start(cmd)
 
-	conn := rw2{
+	conn := connSSH{
 		r:   r,
 		w:   w,
 		cmd: se,
@@ -35,10 +34,10 @@ func SSHRun(sh *ssh.Client, cmd string) (*find.Client, error) {
 		},
 	}
 
-	return find.NewClient(&conn), nil
+	return newClient(&conn), nil
 }
 
-type rw2 struct {
+type connSSH struct {
 	r      io.Reader
 	w      io.WriteCloser
 	cancel func()
@@ -46,15 +45,15 @@ type rw2 struct {
 	cmd    *ssh.Session
 }
 
-func (c *rw2) Read(b []byte) (n int, err error) {
+func (c *connSSH) Read(b []byte) (n int, err error) {
 	return c.r.Read(b)
 }
 
-func (c *rw2) Write(b []byte) (n int, err error) {
+func (c *connSSH) Write(b []byte) (n int, err error) {
 	return c.w.Write(b)
 }
 
-func (c *rw2) Close() error {
+func (c *connSSH) Close() error {
 	c.w.Close()
 
 	if c.timer != nil {
@@ -67,7 +66,7 @@ func (c *rw2) Close() error {
 	return nil
 }
 
-func (c *rw2) SetDeadline(t time.Time) error {
+func (c *connSSH) SetDeadline(t time.Time) error {
 	if c.timer != nil {
 		c.timer.Stop()
 	}

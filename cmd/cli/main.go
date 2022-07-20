@@ -2,14 +2,14 @@ package main
 
 import (
 	"log"
-	"logViewer/find/cli"
+	"logViewer/find"
 	"os"
 )
 
 func main() {
 	log.Println("runing.")
 
-	s := cli.Server{}
+	s := find.ServerCLI{}
 	s.Init()
 	s.Run(os.Stdin, os.Stdout)
 }

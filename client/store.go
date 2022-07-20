@@ -19,4 +19,5 @@ type ViewLog struct {
 	Contains   string
 	Regex      string
 	Decoder    string
+	ServerID   uint64
 }

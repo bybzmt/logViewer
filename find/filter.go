@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"regexp"
 	"regexp/syntax"
 	"strings"
@@ -110,4 +112,20 @@ func ParseTime(t string) (tx time.Time, e error) {
 	}
 
 	return time.ParseInLocation(TimeLayouts[i+1], string(t2), time.Local)
+}
+
+func glob(name string) ([]string, error) {
+	dirs, err := fs.Glob(os.DirFS(""), strings.TrimLeft(name, "/"))
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]string, 0, len(dirs))
+
+	for _, dir := range dirs {
+		dir = "/" + dir
+		out = append(out, dir)
+	}
+
+	return out, nil
 }

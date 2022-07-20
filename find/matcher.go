@@ -14,19 +14,12 @@ type Matcher struct {
 	StartTime  int64
 	EndTime    int64
 	MatchCount int64
-	Limit      uint16
 	BufSize    uint32
 	Tailf      bool
 	watcher    *fsnotify.Watcher
 }
 
 func (rs *Matcher) Match() ([]byte, error) {
-	if rs.Limit > 0 {
-		if rs.MatchCount >= int64(rs.Limit) {
-			return nil, io.EOF
-		}
-	}
-
 	for len(rs.results) > 0 {
 		l, m, err := rs.results.matchByTime()
 		if err != nil {
@@ -136,4 +129,37 @@ func (rs *Matcher) Close() {
 	for _, m := range rs.All {
 		m.f.Close()
 	}
+}
+
+func NewMatcher(m *MatchParam) (*Matcher, error) {
+	f := Matcher{
+		StartTime: m.StartTime,
+		EndTime:   m.EndTime,
+		BufSize:   m.BufSize,
+	}
+
+	for _, fi := range m.Files {
+		reg, err := PerlRegexp(fi.TimeRegex)
+		if err != nil {
+			return nil, err
+		}
+
+		var fs []Filter
+		for _, keys := range fi.Contains {
+			fs = append(fs, FilterContains(keys))
+		}
+
+		f.All = append(f.All, File{
+			Name:       fi.Name,
+			Filters:    fs,
+			TimeParser: TimeParserRegexp(reg, fi.TimeLayout),
+		})
+	}
+
+	err := f.Init()
+	if err != nil {
+		return nil, err
+	}
+
+	return &f, nil
 }

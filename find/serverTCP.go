@@ -1,17 +1,16 @@
-package tcp
+package find
 
 import (
 	"log"
-	"logViewer/find"
 	"net"
 )
 
-type Server struct {
-	find.Server
+type ServerTCP struct {
+	Server
 	Addr string
 }
 
-func (s *Server) Run() {
+func (s *ServerTCP) Run() {
 	if s.Addr == "" {
 		s.Addr = "127.0.0.2:7000"
 	}

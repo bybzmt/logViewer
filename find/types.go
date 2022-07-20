@@ -32,7 +32,6 @@ type MatchParam struct {
 	Files     []FileParam
 	StartTime int64
 	EndTime   int64
-	Limit     uint16
 	BufSize   uint32
 }
 
@@ -41,4 +40,12 @@ type Conn interface {
 	Write(b []byte) (n int, err error)
 	Close() error
 	SetDeadline(t time.Time) error
+}
+
+type Client interface {
+	Glob(pattern string) (out []string, err error)
+	Open(m *MatchParam) (err error)
+	Read() (data []byte, err error)
+	Ping() (err error)
+	Close() (err error)
 }

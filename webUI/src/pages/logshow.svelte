@@ -49,12 +49,12 @@
             return;
         }
 
-        match.Starttime = Date.parse(starttime) / 1000;
+        match.StartTime = Date.parse(starttime) / 1000;
         match.EndTime = Date.parse(endtime) / 1000;
         match.Limit = parseInt(limit);
 
-        if (isNaN(match.Starttime)) {
-            match.Starttime = 0;
+        if (isNaN(match.StartTime)) {
+            match.StartTime = 0;
         }
         if (isNaN(match.EndTime)) {
             match.EndTime = parseInt(new Date().getTime() / 1000);
@@ -69,8 +69,8 @@
 
         ws = new WebSocket("ws://" + API_BASE + "/api/logs");
         ws.onopen = () => {
-            ws.send(JSON.stringify({op:"grep", "data":match}));
-            ws.send(JSON.stringify({op:"read"}));
+            ws.send(JSON.stringify({Op:"grep", "Data":match}));
+            ws.send(JSON.stringify({Op:"read"}));
         };
 
         ws.onclose = () => {
@@ -84,10 +84,10 @@
             if (evt.data instanceof Blob) {
                 msgs.push(await evt.data.text());
 
-                ws.send(JSON.stringify({op:"read"}));
+                ws.send(JSON.stringify({Op:"read"}));
             } else {
                 msgs.push(evt.data);
-                ws.send(JSON.stringify({op:"close"}));
+                ws.send(JSON.stringify({Op:"close"}));
             }
 
             if (msgs.length > msgMax) {

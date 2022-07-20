@@ -18,6 +18,7 @@ const (
 	OP_EXIT OP = iota + 1
 	OP_OK
 	OP_EOF
+	OP_PING
 	OP_MSG
 	OP_ERR
 	//列出文件列表

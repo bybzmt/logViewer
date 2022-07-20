@@ -2,13 +2,13 @@ package main
 
 import (
 	"log"
-	"logViewer/find/tcp"
+	"logViewer/find"
 )
 
 func main() {
 	log.Println("runing.")
 
-	s := tcp.Server{
+	s := find.ServerTCP{
 		Addr: "127.0.0.2:7000",
 	}
 	s.Init()

@@ -1,15 +1,14 @@
-package cli
+package find
 
 import (
 	"context"
 	"io"
-	"logViewer/find"
 	"os"
 	"os/exec"
 	"time"
 )
 
-func Dial(cmd string) (*find.Client, error) {
+func NewClientCLI(cmd string) (Client, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := exec.CommandContext(ctx, cmd)
 	c.Stderr = os.Stderr
@@ -24,7 +23,7 @@ func Dial(cmd string) (*find.Client, error) {
 		return nil, err
 	}
 
-	conn := rw2{
+	conn := connCli{
 		r:      r,
 		w:      w,
 		cancel: cancel,
@@ -39,10 +38,10 @@ func Dial(cmd string) (*find.Client, error) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	return find.NewClient(&conn), nil
+	return newClient(&conn), nil
 }
 
-type rw2 struct {
+type connCli struct {
 	r      io.ReadCloser
 	w      io.WriteCloser
 	cancel context.CancelFunc
@@ -51,15 +50,15 @@ type rw2 struct {
 	cmd    *exec.Cmd
 }
 
-func (c *rw2) Read(b []byte) (n int, err error) {
+func (c *connCli) Read(b []byte) (n int, err error) {
 	return c.r.Read(b)
 }
 
-func (c *rw2) Write(b []byte) (n int, err error) {
+func (c *connCli) Write(b []byte) (n int, err error) {
 	return c.w.Write(b)
 }
 
-func (c *rw2) Close() error {
+func (c *connCli) Close() error {
 	c.r.Close()
 	c.w.Close()
 
@@ -76,7 +75,7 @@ func (c *rw2) Close() error {
 	return nil
 }
 
-func (c *rw2) SetDeadline(t time.Time) error {
+func (c *connCli) SetDeadline(t time.Time) error {
 	if c.timer != nil {
 		c.timer.Stop()
 	}

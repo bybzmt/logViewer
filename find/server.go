@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -77,6 +75,8 @@ func (s *Server) service(ctx *matchCtx) {
 			s.serviceRead(ctx, buf)
 		case OP_STAT:
 			s.serviceStat(ctx, buf)
+		case OP_PING:
+			write(ctx.rw, OP_OK, nil)
 		case OP_EXIT:
 			log.Println("OP_EXIT")
 			return
@@ -91,7 +91,7 @@ func (s *Server) service(ctx *matchCtx) {
 }
 
 func (s *Server) Glob(name string) ([]string, error) {
-	dirs, err := fs.Glob(os.DirFS(""), strings.TrimLeft(name, "/"))
+	dirs, err := glob(name)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,6 @@ func (s *Server) Glob(name string) ([]string, error) {
 	out := make([]string, 0, len(dirs))
 
 	for _, dir := range dirs {
-		dir = "/" + dir
 		if s.hasPrefix(dir) {
 			out = append(out, dir)
 		}
@@ -109,36 +108,13 @@ func (s *Server) Glob(name string) ([]string, error) {
 }
 
 func (s *Server) newMatch(m *MatchParam) (*Matcher, error) {
-	f := Matcher{
-		StartTime: m.StartTime,
-		EndTime:   m.EndTime,
-		Limit:     m.Limit,
-		BufSize:   m.BufSize,
-	}
-
 	for _, fi := range m.Files {
 		if !s.hasPrefix(fi.Name) {
 			return nil, ErrorUser(fmt.Errorf("access denied file:%s", fi.Name))
 		}
-
-		reg, err := PerlRegexp(fi.TimeRegex)
-		if err != nil {
-			return nil, err
-		}
-
-		var fs []Filter
-		for _, keys := range fi.Contains {
-			fs = append(fs, FilterContains(keys))
-		}
-
-		f.All = append(f.All, File{
-			Name:       fi.Name,
-			Filters:    fs,
-			TimeParser: TimeParserRegexp(reg, fi.TimeLayout),
-		})
 	}
 
-	return &f, nil
+	return NewMatcher(m)
 }
 
 func (s *Server) hasPrefix(name string) bool {
@@ -176,17 +152,9 @@ func (s *Server) serviceGrep(ctx *matchCtx, buf []byte) {
 		return
 	}
 
-	err = f.Init()
-	if err != nil {
-		f.Close()
-
-		write(ctx.rw, OP_ERR, []byte(err.Error()))
-		return
-	}
+	ctx.matcher = f
 
 	write(ctx.rw, OP_OK, nil)
-
-	ctx.matcher = f
 }
 
 func (s *Server) serviceRead(ctx *matchCtx, buf []byte) {

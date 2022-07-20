@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-type Client struct {
+type client struct {
 	c       Conn
 	rw      *bufio.ReadWriter
 	Timeout time.Duration
 	err     error
 }
 
-func NewClient(c Conn) *Client {
-	var rs Client
+func newClient(c Conn) Client {
+	var rs client
 	rs.c = c
 	w := bufio.NewWriter(c)
 	r := bufio.NewReader(c)
@@ -28,7 +28,7 @@ func NewClient(c Conn) *Client {
 	return &rs
 }
 
-func (c *Client) Glob(pattern string) (out []string, err error) {
+func (c *client) Glob(pattern string) (out []string, err error) {
 	defer c.tryErr(&err)
 
 	c.c.SetDeadline(time.Now().Add(c.Timeout))
@@ -46,7 +46,7 @@ func (c *Client) Glob(pattern string) (out []string, err error) {
 	return
 }
 
-func (c *Client) Open(m *MatchParam) (err error) {
+func (c *client) Open(m *MatchParam) (err error) {
 	defer c.tryErr(&err)
 
 	c.c.SetDeadline(time.Now().Add(c.Timeout))
@@ -70,7 +70,7 @@ func (c *Client) Open(m *MatchParam) (err error) {
 	return
 }
 
-func (c *Client) Read() (data []byte, err error) {
+func (c *client) Read() (data []byte, err error) {
 	defer c.tryErr(&err)
 
 	c.c.SetDeadline(time.Now().Add(c.Timeout))
@@ -97,7 +97,29 @@ func (c *Client) Read() (data []byte, err error) {
 	return
 }
 
-func (c *Client) Close() (err error) {
+func (c *client) Ping() (err error) {
+	defer c.tryErr(&err)
+
+	write(c.rw, OP_PING, nil)
+	if e := c.rw.Flush(); e != nil {
+		panic(ErrorIO(e))
+	}
+
+	op, buf := read(c.rw)
+
+	switch op {
+	case OP_ERR:
+		err = errors.New(string(buf))
+	case OP_OK:
+		return nil
+	default:
+		panic(unexpectedOP(op))
+	}
+
+	return
+}
+
+func (c *client) Close() (err error) {
 	defer func() {
 		err = c.c.Close()
 		c.tryErr(&err)
@@ -116,7 +138,7 @@ func (c *Client) Close() (err error) {
 	return
 }
 
-func (c *Client) tryErr(err *error) {
+func (c *client) tryErr(err *error) {
 	switch p := recover(); e := p.(type) {
 	case ErrorIO:
 		c.err = e

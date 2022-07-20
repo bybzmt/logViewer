@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"logViewer/find"
-	"logViewer/find/cli"
 
 	"github.com/gorilla/websocket"
 	"github.com/timshannon/bolthold"
@@ -225,11 +224,9 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	//addr := "127.0.0.2:7000"
-	addr := "./cmd/cli/cli"
-	rs, err := cli.Dial(addr)
+	rs, err := findDial(u.store, 1)
 	if err != nil {
-		log.Println(err)
+		log.Println("find", err)
 		return
 	}
 
@@ -251,8 +248,8 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var msg struct {
-			Op   string          `json:"op"`
-			Data json.RawMessage `json:"data"`
+			Op   string
+			Data json.RawMessage
 		}
 
 		err = json.Unmarshal(buf, &msg)
@@ -267,17 +264,31 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 
 		if mtype == websocket.TextMessage {
 			switch msg.Op {
-			case "read":
-				d, err := rs.Read()
+			case "glob":
+				var pattern string
+
+				err = json.Unmarshal(msg.Data, &pattern)
 				if err != nil {
-					if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
-						log.Println(err)
-					}
-				} else {
-					if err := conn.WriteMessage(websocket.BinaryMessage, d); err != nil {
-						log.Println(err)
-					}
+					log.Println(err)
+					return
 				}
+
+				files, err := rs.Glob(pattern)
+
+				if err != nil {
+					log.Println("glob", err)
+					return
+				}
+
+				out := struct {
+					Op    string
+					Files []string
+				}{Op: "glob", Files: files}
+
+				if err := conn.WriteJSON(&out); err != nil {
+					log.Println(err)
+				}
+
 			case "grep":
 				var m find.MatchParam
 
@@ -289,6 +300,17 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 				if err = rs.Open(&m); err != nil {
 					log.Println("open", err)
 					return
+				}
+			case "read":
+				d, err := rs.Read()
+				if err != nil {
+					if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
+						log.Println(err)
+					}
+				} else {
+					if err := conn.WriteMessage(websocket.BinaryMessage, d); err != nil {
+						log.Println(err)
+					}
 				}
 			case "close":
 				log.Println("close")
@@ -310,11 +332,9 @@ func (u *Ui) apiGlob(w http.ResponseWriter, r *http.Request) {
 	}{}
 	defer json.NewEncoder(w).Encode(&rs)
 
-	addr := "./cmd/cli/cli"
-	//addr := "127.0.0.2:7000"
-	c, err := cli.Dial(addr)
+	c, err := findDial(u.store, 1)
 	if err != nil {
-		rs.Err = err.Error()
+		log.Println("find", err)
 		return
 	}
 
