@@ -1,6 +1,7 @@
 <script>
     import Layout from "./lib/layout.svelte";
     import { getContext, onMount, onDestroy } from "svelte";
+    import { DateInput } from 'date-picker-svelte'
 
     let axios = getContext("axios");
     let logs = [];
@@ -10,10 +11,16 @@
     let msgs = [];
     let msgMax = 200;
 
-    let starttime = "";
-    let endtime = "";
+    let starttime = new Date();
     let contains = "";
     let limit = "";
+
+    starttime.setSeconds(0)
+    starttime.setMinutes(0)
+    starttime.setHours(0)
+
+    let endtime = (new Date());
+    endtime.setTime(starttime.getTime() + 60*60*24*1000);
 
     function viewLogs() {
         axios({ url: "/api/viewLogs" }).then((resp) => {
@@ -49,8 +56,8 @@
             return;
         }
 
-        match.StartTime = Date.parse(starttime) / 1000;
-        match.EndTime = Date.parse(endtime) / 1000;
+        match.StartTime = parseInt(starttime.getTime()/1000);
+        match.EndTime = parseInt(endtime.getTime()/1000);
         match.Limit = parseInt(limit);
 
         if (isNaN(match.StartTime)) {
@@ -152,9 +159,9 @@
             {/each}
         </div>
         <div class="border w-4/5">
-            <div>
-                <input class="border w-[10em]" bind:value={starttime} placeholder="开始时间" />
-                <input class="border w-[10em]" bind:value={endtime} placeholder="结束时间" />
+            <div class="flex">
+                <DateInput bind:value={starttime}  />
+                <DateInput bind:value={endtime}  />
                 <select>
                     <option>开头</option>
                     <option>未尾</option>
@@ -177,4 +184,7 @@
 </Layout>
 
 <style>
+    :root {
+        --date-input-width: 10.5em;
+    }
 </style>

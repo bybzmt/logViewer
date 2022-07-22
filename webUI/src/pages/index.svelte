@@ -3,33 +3,30 @@
     import { getContext, onMount, onDestroy } from "svelte";
 
     let axios = getContext("axios");
-    let rows = [];
-    let selected = {};
 
-    function viewLogs() {
-        axios({ url: "/api/viewLogs" }).then((resp) => {
-            rows = resp.data;
-        });
-    }
+    let servers = [];
 
-    function save() {
-        let url = selected.ID ? "/api/viewLog/edit" : "/api/viewLog/add";
-        axios({
-            method: "post",
-            url: url,
-            data: new URLSearchParams(selected),
-        }).then(() => {
-            viewLogs();
-            selected = {};
+    function getServers() {
+        axios({ url: "/api/servers" }).then((resp) => {
+            servers = resp.data;
         });
     }
 
     onMount(() => {
-        viewLogs();
+        getServers();
     });
 </script>
 
-<Layout>index</Layout>
+<Layout>
+    <div class="w-1/4">
+        <select rows={servers}>
+            {#each servers as row}
+                <option value="{row}">{row.Note}</option>
+            {/each}
+        </select>
+        <button>logs</button>
+    </div>
+</Layout>
 
 <style>
 </style>
