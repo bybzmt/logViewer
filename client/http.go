@@ -11,8 +11,8 @@ import (
 
 	"logViewer/find"
 
+	"github.com/bybzmt/bolthold"
 	"github.com/gorilla/websocket"
-	"github.com/timshannon/bolthold"
 )
 
 //go:embed dist/*
@@ -29,10 +29,12 @@ func (u *Ui) Init() {
 	tfs, _ := fs.Sub(uifiles, "dist")
 	u.handler.Handle("/", http.FileServer(http.FS(tfs)))
 	u.handler.Handle("/api/servers", u.cross(u.apiServers))
+	u.handler.Handle("/api/server", u.cross(u.apiServerGet))
 	u.handler.Handle("/api/server/add", u.cross(u.apiServerAdd))
 	u.handler.Handle("/api/server/edit", u.cross(u.apiServerEdit))
 	u.handler.Handle("/api/server/del", u.cross(u.apiServerDel))
 	u.handler.Handle("/api/viewLogs", u.cross(u.apiViewLogs))
+	u.handler.Handle("/api/viewLog", u.cross(u.apiViewLogGet))
 	u.handler.Handle("/api/viewLog/add", u.cross(u.apiViewLogAdd))
 	u.handler.Handle("/api/viewLog/edit", u.cross(u.apiViewLogEdit))
 	u.handler.Handle("/api/viewLog/del", u.cross(u.apiViewLogDel))
@@ -80,6 +82,19 @@ func (u *Ui) apiServers(w http.ResponseWriter, r *http.Request) {
 	t1 := []ServerConfig{}
 
 	err := u.store.Find(&t1, new(bolthold.Query))
+	if err != nil {
+		log.Println("log find", err)
+	}
+
+	json.NewEncoder(w).Encode(&t1)
+}
+
+func (u *Ui) apiServerGet(w http.ResponseWriter, r *http.Request) {
+	var t1 ServerConfig
+
+	id, _ := strconv.Atoi(r.FormValue("ID"))
+
+	err := u.store.FindOne(&t1, bolthold.Where("ID").Eq(uint64(id)))
 	if err != nil {
 		log.Println("log find", err)
 	}
@@ -143,7 +158,28 @@ func (u *Ui) apiServerDel(w http.ResponseWriter, r *http.Request) {
 func (u *Ui) apiViewLogs(w http.ResponseWriter, r *http.Request) {
 	t1 := []ViewLog{}
 
-	err := u.store.Find(&t1, nil)
+	sid, _ := strconv.Atoi(r.FormValue("sid"))
+
+	var query *bolthold.Query
+
+	if sid != 0 {
+		query = bolthold.Where("ServerID").Eq(uint64(sid))
+	}
+
+	err := u.store.Find(&t1, query)
+	if err != nil {
+		log.Println("log find", err)
+	}
+
+	json.NewEncoder(w).Encode(&t1)
+}
+
+func (u *Ui) apiViewLogGet(w http.ResponseWriter, r *http.Request) {
+	var t1 ViewLog
+
+	id, _ := strconv.Atoi(r.FormValue("ID"))
+
+	err := u.store.FindOne(&t1, bolthold.Where("ID").Eq(uint64(id)))
 	if err != nil {
 		log.Println("log find", err)
 	}
@@ -154,14 +190,15 @@ func (u *Ui) apiViewLogs(w http.ResponseWriter, r *http.Request) {
 func (u *Ui) apiViewLogAdd(w http.ResponseWriter, r *http.Request) {
 	var rs ViewLog
 
-	id, _ := strconv.Atoi(r.FormValue("ID"))
-	rs.ID = uint64(id)
+	ServerID, _ := strconv.Atoi(r.FormValue("ServerID"))
+
 	rs.Note = r.FormValue("Note")
 	rs.Files = r.FormValue("Files")
 	rs.TimeRegex = r.FormValue("TimeRegex")
 	rs.TimeLayout = r.FormValue("TimeLayout")
 	rs.Contains = r.FormValue("Contains")
 	rs.Regex = r.FormValue("Regex")
+	rs.ServerID = uint64(ServerID)
 
 	err := u.store.Insert(bolthold.NextSequence(), &rs)
 	if err != nil {
@@ -303,8 +340,14 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 				}
 			case "read":
 				d, err := rs.Read()
+
 				if err != nil {
-					if err := conn.WriteMessage(websocket.TextMessage, []byte(err.Error())); err != nil {
+					out := struct {
+						Op  string
+						Err string
+					}{Op: "read", Err: err.Error()}
+
+					if err := conn.WriteJSON(&out); err != nil {
 						log.Println(err)
 					}
 				} else {
@@ -312,6 +355,22 @@ func (u *Ui) apiLogs(w http.ResponseWriter, r *http.Request) {
 						log.Println(err)
 					}
 				}
+			case "ping":
+				err := rs.Ping()
+
+				out := struct {
+					Op  string
+					Err string
+				}{Op: "ping"}
+
+				if err != nil {
+					out.Err = err.Error()
+				}
+
+				if err := conn.WriteJSON(&out); err != nil {
+					log.Println(err)
+				}
+				return
 			case "close":
 				log.Println("close")
 				return

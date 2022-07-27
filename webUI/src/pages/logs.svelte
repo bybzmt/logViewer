@@ -1,9 +1,28 @@
+<script context="module">
+    export const load = async ({ query, context }) => {
+        let axios = context.get("axios");
+
+        let rows = await axios({ url: "/api/viewLogs?sid=" + query.get("sid") }).then((resp) => {
+            return resp.data;
+        });
+
+        return {
+            props: {
+                rows: rows,
+                server_id: query.get("sid"),
+            },
+        };
+    };
+</script>
+
 <script>
     import Layout from "./lib/layout.svelte";
     import { getContext, onMount, onDestroy } from "svelte";
 
+    export let rows;
+    export let server_id;
+
     let axios = getContext("axios");
-    let rows = [];
     let selected = {};
 
     function viewLogs() {
@@ -28,65 +47,54 @@
         selected = {};
     }
 
-    onMount(() => {
-        viewLogs();
-    });
+    onMount(() => {});
 </script>
 
 <Layout>
-    <div class="flex">
-        <div class="border w-1/4">
-            <ul>
-                {#each rows as log}
-                    <li
-                        on:click={() => {
-                            selected = log;
-                        }}>
-                        {log.Note ? log.Note : log.ID}
-                    </li>
-                {/each}
-                <li on:click={add}>添加</li>
-            </ul>
-        </div>
-        <div class="border w-full">
-            <table>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Note</th>
+                <th>Files</th>
+                <th colspan="3" />
+            </tr>
+        </thead>
+        <tbody>
+            {#each rows as row}
                 <tr>
-                    <td>名称</td>
-                    <td><input class="border" bind:value={selected.Note} /></td>
-                </tr>
-                <tr>
-                    <td>文件列表</td>
-                    <td><textarea class="border" bind:value={selected.Files} /></td>
-                </tr>
-                <tr>
-                    <td>时间正则</td>
-                    <td><input class="border" bind:value={selected.TimeRegex} /></td>
-                </tr>
-                <tr>
-                    <td>时间格式</td>
-                    <td><input class="border" bind:value={selected.TimeLayout} /></td>
-                </tr>
-                <tr>
-                    <td>包含</td>
-                    <td><textarea class="border" bind:value={selected.Contains} /></td>
-                </tr>
-                <tr>
-                    <td>正则</td>
-                    <td><textarea class="border" bind:value={selected.Regex} /></td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="text-center">
-                        {#if selected.ID}
-                            <button on:click={save}>保存</button>
-                        {:else}
-                            <button on:click={save}>添加</button>
-                        {/if}
+                    <td>{row.ID}</td>
+                    <td>{row.Note}</td>
+                    <td>{row.Files}</td>
+                    <td>
+                        <a href="#/server_edit?id={row.ID}">Edit</a>
+                    </td>
+                    <td>
+                        <a>Del</a>
                     </td>
                 </tr>
-            </table>
-        </div>
-    </div>
+            {/each}
+
+            <tr>
+                <td class="text-center" colspan="3">--</td>
+                <td>
+                    <a href="#/log_edit?sid={server_id}">Add</a>
+                </td>
+                <td>
+                    <a href="#/logshow?sid={server_id}">Cancel</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 </Layout>
 
 <style>
+    table {
+        margin: 1em;
+    }
+    td,
+    th {
+        border: 1px solid #777;
+        padding: 3px 5px;
+    }
 </style>

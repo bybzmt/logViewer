@@ -6,7 +6,7 @@ function match(routes, url) {
   if (uri == "") {
     uri = "/"
   } else {
-    uri = uri.substring(1)
+    uri = uri.substring(1).split("?")[0];
   }
 
   let page = routes.map[uri];
@@ -29,10 +29,17 @@ async function loadPage(context, routes, url) {
   }
 
   let p = await res.page()
+  let params = url.searchParams;
+
+  let tmp = url.hash.substring(1).split("?")
+  if (tmp.length > 1) {
+    params = new URLSearchParams(tmp[1]);
+  }
 
   let input = {
     url,
-    query: url.searchParams,
+    query: params,
+    context,
   }
 
   let resp;

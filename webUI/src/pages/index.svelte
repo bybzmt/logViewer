@@ -34,10 +34,10 @@
                 <td>{row.Note}</td>
                 <td>{row.Addr}</td>
                 <td>
-                    <a href="#/logs?sid={row.ID}">Logs</a>
+                    <a href="#/logshow?sid={row.ID}">Logs</a>
                 </td>
                 <td>
-                    <a href="#/logshow?sid={row.ID}">Edit</a>
+                    <a href="#/server_edit?id={row.ID}">Edit</a>
                 </td>
                 <td>
                     <a>Del</a>
@@ -48,7 +48,7 @@
             <tr>
                 <td class="text-center" colspan="5">--</td>
                 <td>
-                    <a>Add</a>
+                    <a href="#/server_edit">Add</a>
                 </td>
             </tr>
         </tbody>
@@ -61,5 +61,6 @@
     }
     td, th {
         border: 1px solid #777;
+        padding: 3px 5px;
     }
 </style>

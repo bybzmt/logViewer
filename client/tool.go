@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"regexp/syntax"
 
-	"github.com/timshannon/bolthold"
+	"github.com/bybzmt/bolthold"
 	"golang.org/x/crypto/ssh"
 )
 

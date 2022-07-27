@@ -3,9 +3,7 @@
 </script>
 
 <div>
-    <a href="#/servers">服务器</a>
-    <a href="#/logs">日志列表</a>
-    <a href="#/logshow">查看</a>
+    <a href="#/">服务器</a>
 </div>
 <div class="mt-10">
     <slot />
